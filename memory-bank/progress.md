@@ -1,6 +1,6 @@
 # QuestLog - Progress
 
-## Current Status: Project Initialization
+## Current Status: Authentication Setup
 
 ### ✅ Completed
 - [x] Memory bank system established
@@ -8,23 +8,27 @@
 - [x] Technical stack decisions made
 - [x] Architecture patterns documented
 - [x] Foundation phase planning started
-
-### 🔄 In Progress
 - [x] Development environment setup
 - [x] Project structure initialization
 - [x] Core dependency configuration
-- [x] Login screen setup
-- [ ] Supabase project creation and configuration
+- [x] Login screen setup with progressive disclosure
+- [x] Supabase project creation and configuration
+- [x] Database schema setup (JWT issue resolved)
+- [x] Documentation organization (moved to docs/ folder)
+
+### 🔄 In Progress  
+- [x] OAuth cleanup completed - All OAuth removed for fresh start ✅
+- [x] Development environment fixes - Expo Go mode working ✅
+- [ ] Choose new authentication approach
+- [ ] Authentication implementation
+- [ ] Navigation to main app screens
 
 ### 📋 Planned (Foundation Phase)
-- [x] React Native + Expo project setup
-- [x] TypeScript configuration
-- [ ] Supabase project creation and configuration
 - [ ] RAWG API integration setup
 - [ ] Basic navigation structure
-- [ ] Retro theme system implementation
-- [ ] Authentication flow setup
-- [ ] Core data models and database schema
+- [ ] Authentication flow completion
+- [ ] Core data models validation
+- [ ] Main app screens structure
 
 ### 🎯 Next Phase Goals (MVP)
 - [ ] Game logging functionality
@@ -34,24 +38,30 @@
 - [ ] Game search and selection
 
 ### Known Issues
-- None yet - project in initialization phase
+- Database schema JWT permission issue resolved ✅
+- OAuth providers need configuration in external consoles ✅  
+- AuthSessionMissingError on app startup resolved ✅
+- Expo development build mode preventing QR code launch resolved ✅
 
 ### Architecture Decisions Made
 1. **Mobile-First**: React Native for cross-platform mobile
 2. **Backend**: Supabase for database, auth, and real-time features
 3. **Game Data**: RAWG API for comprehensive game metadata
 4. **State Management**: Start with React Context, evolve as needed
-5. **Styling**: Custom retro theme system
+5. **Styling**: Custom retro theme system with cozy, friendly aesthetic
 6. **Development**: Expo for rapid iteration and deployment
+7. **Documentation**: Organized in docs/ folder for user guidance
 
 ### Key Learnings
-- Memory bank system will be essential for maintaining project continuity
-- Retro aesthetic impacts both visual design and UX interaction patterns
-- Mobile performance constraints must drive all technical decisions
-- Foundation phase architecture decisions are critical for scalability
+- Memory bank system essential for project continuity
+- Cozy, friendly aesthetic over harsh retro styling works better
+- Progressive disclosure in login improves UX
+- Supabase JWT secrets are managed automatically
+- Documentation organization improves workflow
 
 ### Evolution Notes
-- Started with clear vision: "Letterboxd for games" with retro handheld feel
+- Started with clear vision: "Letterboxd for games" with cozy gaming feel
+- Shifted from harsh retro to warm, friendly aesthetic
 - Established collaborative, building-focused workflow
-- Prioritized practical iteration over extensive upfront planning
-- Memory bank documentation pattern ensures project continuity
+- Created comprehensive documentation structure in docs/
+- Login flow uses progressive disclosure (Begin Adventure → Auth Options)
