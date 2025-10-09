@@ -28,11 +28,27 @@ const GameControllerIcon = () => (
 
 export const LoginScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
+  const [showAuthOptions, setShowAuthOptions] = useState(false);
+
+  const handleBeginAdventure = () => {
+    setShowAuthOptions(true);
+  };
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
     // TODO: Implement Google Sign In
     console.log('Google Sign In');
+    
+    // Simulate loading
+    setTimeout(() => {
+      setLoading(false);
+    }, 1000);
+  };
+
+  const handleMetaSignIn = async () => {
+    setLoading(true);
+    // TODO: Implement Meta Sign In
+    console.log('Meta Sign In');
     
     // Simulate loading
     setTimeout(() => {
@@ -60,29 +76,55 @@ export const LoginScreen: React.FC = () => {
             <View style={styles.mainContent}>
               <GameControllerIcon />
               
-              <Text style={styles.welcomeTitle}>Welcome Back!</Text>
+              <Text style={styles.welcomeTitle}>Start Your Quest!</Text>
               <Text style={styles.welcomeSubtitle}>
-                Sign in to track your progress, earn XP, and level up your gaming experience.
+                Track your games, earn XP, unlock achievements, and level up your gaming journey.
               </Text>
             </View>
 
             {/* Footer with Sign In */}
             <View style={styles.footer}>
-              <TouchableOpacity
-                style={[styles.googleButton, loading && styles.googleButtonLoading]}
-                onPress={handleGoogleSignIn}
-                disabled={loading}
-              >
-                <View style={styles.googleIcon}>
-                  <Text style={styles.googleIconText}>G</Text>
+              {!showAuthOptions ? (
+                // Initial "Begin Your Adventure" button
+                <TouchableOpacity
+                  style={styles.beginButton}
+                  onPress={handleBeginAdventure}
+                >
+                  <Text style={styles.beginButtonText}>Begin Your Adventure</Text>
+                </TouchableOpacity>
+              ) : (
+                // Authentication options
+                <View style={styles.authOptions}>
+                  <TouchableOpacity
+                    style={[styles.authButton, styles.googleButton, loading && styles.authButtonLoading]}
+                    onPress={handleGoogleSignIn}
+                    disabled={loading}
+                  >
+                    <View style={styles.googleIcon}>
+                      <Text style={styles.googleIconText}>G</Text>
+                    </View>
+                    <Text style={styles.authButtonText}>
+                      {loading ? 'Signing in...' : 'Sign in with Google'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.authButton, styles.metaButton, loading && styles.authButtonLoading]}
+                    onPress={handleMetaSignIn}
+                    disabled={loading}
+                  >
+                    <View style={styles.metaIcon}>
+                      <Text style={styles.metaIconText}>f</Text>
+                    </View>
+                    <Text style={styles.authButtonText}>
+                      {loading ? 'Signing in...' : 'Sign in with Meta'}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
-                <Text style={styles.googleButtonText}>
-                  {loading ? 'Signing in...' : 'Sign in with Google'}
-                </Text>
-              </TouchableOpacity>
+              )}
               
               <Text style={styles.termsText}>
-                By continuing, you agree to our Terms of Service and Privacy Policy.
+                Ready to level up? Join thousands of gamers tracking their epic journeys.
               </Text>
             </View>
           </ScrollView>
@@ -209,10 +251,33 @@ const styles = StyleSheet.create({
     gap: RetroTheme.spacing.md,
   },
   
-  googleButton: {
+  // Initial adventure button
+  beginButton: {
     width: '100%',
     height: 48,
     backgroundColor: RetroTheme.colors.primary,
+    borderRadius: RetroTheme.borderRadius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...RetroTheme.shadows.small,
+  },
+  
+  beginButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: RetroTheme.colors.background,
+    fontFamily: RetroTheme.fonts.primary,
+  },
+  
+  // Auth options container
+  authOptions: {
+    gap: RetroTheme.spacing.sm,
+  },
+  
+  // Base auth button style
+  authButton: {
+    width: '100%',
+    height: 48,
     borderRadius: RetroTheme.borderRadius.lg,
     flexDirection: 'row',
     alignItems: 'center',
@@ -221,8 +286,20 @@ const styles = StyleSheet.create({
     ...RetroTheme.shadows.small,
   },
   
-  googleButtonLoading: {
+  authButtonLoading: {
     opacity: 0.7,
+  },
+  
+  authButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: RetroTheme.colors.background,
+    fontFamily: RetroTheme.fonts.primary,
+  },
+  
+  // Google button
+  googleButton: {
+    backgroundColor: RetroTheme.colors.primary,
   },
   
   googleIcon: {
@@ -240,11 +317,24 @@ const styles = StyleSheet.create({
     color: RetroTheme.colors.primary,
   },
   
-  googleButtonText: {
-    fontSize: 16,
+  // Meta button
+  metaButton: {
+    backgroundColor: '#1877F2', // Facebook/Meta blue
+  },
+  
+  metaIcon: {
+    width: 20,
+    height: 20,
+    backgroundColor: RetroTheme.colors.text,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  
+  metaIconText: {
+    fontSize: 14,
     fontWeight: 'bold',
-    color: RetroTheme.colors.background,
-    fontFamily: RetroTheme.fonts.primary,
+    color: '#1877F2',
   },
   
   termsText: {
