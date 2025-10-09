@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "QuestLogApp",
-    "slug": "QuestLogApp",
+    "name": "QuestLog",
+    "slug": "questlog",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -10,21 +10,29 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#221c10"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.questlog.app"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#221c10"
       },
+      "package": "com.questlog.app",
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "scheme": "questlog",
+    "extra": {
+      "eas": {
+        "projectId": "98a9b5b4-8fa0-427c-92ce-639a3dc36a59"
+      }
     }
   }
 }
