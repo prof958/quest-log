@@ -8,6 +8,57 @@ export interface AuthResult {
 }
 
 export class AuthService {
+  // Sign up with email and password
+  static async signUp(email: string, password: string, userData?: { username?: string }): Promise<{ user: User | null; error: AuthError | null }> {
+    try {
+      console.log('🚀 Starting email sign up...');
+      
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            username: userData?.username || email.split('@')[0],
+          }
+        }
+      });
+
+      if (error) {
+        console.error('❌ Sign up error:', error);
+        return { user: null, error };
+      }
+
+      console.log('✅ Sign up successful:', { userId: data.user?.id, email: data.user?.email });
+      return { user: data.user, error: null };
+    } catch (error) {
+      console.error('❌ Sign up exception:', error);
+      return { user: null, error: error as AuthError };
+    }
+  }
+
+  // Sign in with email and password
+  static async signInWithEmail(email: string, password: string): Promise<{ user: User | null; session: Session | null; error: AuthError | null }> {
+    try {
+      console.log('🚀 Starting email sign in...');
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        console.error('❌ Sign in error:', error);
+        return { user: null, session: null, error };
+      }
+
+      console.log('✅ Sign in successful:', { userId: data.user?.id, email: data.user?.email });
+      return { user: data.user, session: data.session, error: null };
+    } catch (error) {
+      console.error('❌ Sign in exception:', error);
+      return { user: null, session: null, error: error as AuthError };
+    }
+  }
+
   // Sign out
   static async signOut(): Promise<{ error: AuthError | null }> {
     try {
