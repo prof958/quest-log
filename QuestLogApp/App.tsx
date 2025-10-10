@@ -2,7 +2,7 @@ import React from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
-import { LoginScreen } from './src/screens/LoginScreen';
+import { AuthFlow } from './src/screens/AuthFlow';
 import { AuthSuccessScreen } from './src/screens/AuthSuccessScreen';
 import { RetroTheme } from './src/theme/RetroTheme';
 
@@ -23,8 +23,8 @@ function AppContent() {
     return <AuthSuccessScreen />;
   }
 
-  // Show login screen if not authenticated
-  return <LoginScreen />;
+  // Show auth flow (login/signup) if no user
+  return <AuthFlow />;
 }
 
 export default function App() {
