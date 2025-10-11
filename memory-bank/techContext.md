@@ -16,10 +16,12 @@
 - **Storage**: File uploads for user avatars, game screenshots
 - **Edge Functions**: Custom logic processing
 
-### External APIs
-- **RAWG API**: Game database, metadata, artwork
-- **Rate Limiting**: Caching strategy for API calls
-- **Offline Support**: Local storage for critical data
+### Game Data Strategy
+- **Local Database**: JSON file with curated popular games (20+ titles)
+- **LocalGameService**: Custom service providing IGDB-compatible interface
+- **No External APIs**: Eliminates CORS issues, rate limits, and network dependencies
+- **Instant Performance**: All game searches and data access are synchronous
+- **Offline First**: Complete functionality without internet connection
 
 ## Development Environment
 - **Package Manager**: npm/yarn
@@ -42,9 +44,17 @@
   "expo": "~49.0.0",
   "@supabase/supabase-js": "^2.x",
   "react-navigation": "^6.x",
-  "react-native-reanimated": "^3.x"
+  "react-native-reanimated": "^3.x",
+  "react-dom": "web platform support",
+  "react-native-web": "web platform support"
 }
 ```
+
+## Local Development Setup
+- **Node.js**: Required for npm and development tools
+- **Web Testing**: http://localhost:8081 for browser-based testing
+- **Mobile Testing**: Expo Go app for device testing
+- **No Server Dependencies**: All game data served from local JSON files
 
 ## Development Workflow
 - **Environment**: Local development with Expo Go

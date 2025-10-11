@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { RetroTheme } from '../theme/RetroTheme';
 import { AuthService } from '../services/AuthService';
 import { supabase } from '../lib/supabase';
+import MainAppScreen from './MainAppScreen';
 
 export const AuthSuccessScreen: React.FC = () => {
   const [user, setUser] = useState<any>(null);
@@ -54,6 +55,11 @@ export const AuthSuccessScreen: React.FC = () => {
     );
   }
 
+  // If user is authenticated, show the main app
+  if (user) {
+    return <MainAppScreen />;
+  }
+
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -68,15 +74,9 @@ export const AuthSuccessScreen: React.FC = () => {
           <Text style={styles.title}>Welcome to QuestLog!</Text>
           <Text style={styles.subtitle}>Your adventure begins now</Text>
           
-          {user && (
-            <View style={styles.userInfo}>
-              <Text style={styles.userText}>Signed in as:</Text>
-              <Text style={styles.userName}>{user.email}</Text>
-              <Text style={styles.provider}>
-                via {user.app_metadata?.provider || 'OAuth'}
-              </Text>
-            </View>
-          )}
+          <Text style={styles.nextText}>
+            🎮 Authentication complete - preparing your gaming journey!
+          </Text>
           
           <Text style={styles.nextText}>
             🎮 Ready to start tracking your games and earning XP!
