@@ -3,15 +3,20 @@
 ## Architecture Overview
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   React Native  │────│    Supabase      │────│   RAWG API      │
-│   (Frontend)    │    │   (Backend)      │    │ (Game Data)     │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-        │                        │                        │
-        │              ┌─────────────────┐                │
-        └──────────────│ Local Storage   │────────────────┘
-                       │ (SQLite/MMKV)   │
+│   React Native  │────│    Supabase      │    │   Local Game    │
+│   (Frontend)    │    │  (User Data)     │    │   Database      │
+└─────────────────┘    └──────────────────┘    │ (popular-games  │
+        │                        │             │     .json)      │
+        │              ┌─────────────────┐     └─────────────────┘
+        └──────────────│ LocalGameService│             │
+                       │  (Game Search)  │─────────────┘
                        └─────────────────┘
 ```
+
+**Local-First Architecture**: 
+- Game data served from local JSON database for instant performance
+- User data (libraries, progress) stored in Supabase for persistence
+- No external API dependencies for core game search functionality
 
 ## Key Design Patterns
 
@@ -49,12 +54,19 @@
 5. **Protected Routes**: Auth state guards for authenticated-only screens
 6. **Fallback**: Email/password authentication available as alternative
 
-### Game Logging Flow
-1. Search games (RAWG API + local cache)
-2. Select game → Pre-populate metadata
-3. User input → Status, rating, notes
-4. Save → Local storage + Supabase sync
-5. XP calculation → Quest progress update
+### Game Discovery & Selection Flow
+1. **Game Search**: LocalGameService provides instant search from local JSON database
+2. **Popular Games**: Curated list of 20+ games with rich metadata (ratings, genres, platforms)
+3. **Game Selection**: Choose from search results or popular games
+4. **Library Addition**: Save to user's personal game library via Supabase
+5. **Status Tracking**: Mark games as wishlist, playing, completed, etc.
+
+### Game Database Pattern
+- **Local JSON**: `src/data/popular-games.json` contains curated game collection
+- **Service Layer**: `LocalGameService` provides IGDB-compatible interface
+- **Search Functionality**: Title-based search with instant results
+- **Metadata Structure**: ID, name, summary, rating, genres, platforms, cover art
+- **Performance**: Zero latency, no network dependencies, mobile-optimized
 
 ### XP System
 - **Action Types**: Log game, write review, complete quest, daily login
@@ -96,6 +108,13 @@ App
 - **signInWithEmail()**: Email/password authentication
 - **signUp()**: User registration handling
 - **signOut()**: Session cleanup and state reset
+
+### LocalGameService
+- **searchGames()**: Search local database by title
+- **getPopularGames()**: Retrieve curated popular games list
+- **convertToIGDBFormat()**: Maintain compatibility with IGDB interface
+- **getAllGenres()**: Get available game genres for filtering
+- **Performance**: All operations are synchronous and instant
 
 ### AuthContext
 - **Global State**: User session management across app
