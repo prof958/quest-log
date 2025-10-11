@@ -380,6 +380,8 @@ const styles = StyleSheet.create({
   footer: {
     paddingBottom: RetroTheme.spacing.lg,
     gap: RetroTheme.spacing.md,
+    alignItems: 'center',
+    width: '100%',
   },
   
   // Initial adventure button
@@ -549,7 +551,8 @@ const styles = StyleSheet.create({
   // Action buttons container
   actionButtonsContainer: {
     width: '100%',
-    maxWidth: 300,
+    alignItems: 'center',
+    alignSelf: 'center',
     gap: RetroTheme.spacing.md,
     marginBottom: RetroTheme.spacing.lg,
   },
@@ -557,11 +560,13 @@ const styles = StyleSheet.create({
   // Login action button
   loginActionButton: {
     width: '100%',
+    maxWidth: 300,
     height: 56,
     backgroundColor: RetroTheme.colors.primary,
     borderRadius: RetroTheme.borderRadius.lg,
     alignItems: 'center',
     justifyContent: 'center',
+    alignSelf: 'center',
     ...RetroTheme.shadows.small,
   },
 
@@ -570,11 +575,13 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: RetroTheme.colors.background,
     fontFamily: RetroTheme.fonts.primary,
+    textAlign: 'center',
   },
 
   // Signup action button
   signupActionButton: {
     width: '100%',
+    maxWidth: 300,
     height: 56,
     backgroundColor: 'transparent',
     borderWidth: 3,
@@ -582,6 +589,7 @@ const styles = StyleSheet.create({
     borderRadius: RetroTheme.borderRadius.lg,
     alignItems: 'center',
     justifyContent: 'center',
+    alignSelf: 'center',
   },
 
   signupActionButtonText: {
@@ -589,6 +597,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: RetroTheme.colors.primary,
     fontFamily: RetroTheme.fonts.primary,
+    textAlign: 'center',
   },
 
   // Back to start button
