@@ -59,6 +59,40 @@ export class AuthService {
     }
   }
 
+  // Sign in with Google OAuth
+  static async signInWithGoogle(): Promise<{ data: any; error: AuthError | null }> {
+    try {
+      console.log('🚀 Starting Google OAuth sign in...');
+      console.log('📍 Current URL:', window.location.href);
+      console.log('📍 Redirect URL will be:', `${window.location.origin}/auth/callback`);
+      
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        }
+      });
+
+      if (error) {
+        console.error('❌ Google OAuth error:', error);
+        console.error('❌ Error details:', {
+          message: error.message,
+          status: error.status,
+          details: error
+        });
+        return { data: null, error };
+      }
+
+      console.log('✅ Google OAuth initiated successfully');
+      console.log('✅ OAuth data:', data);
+      console.log('📝 OAuth URL:', data?.url);
+      return { data, error: null };
+    } catch (error) {
+      console.error('❌ Google OAuth exception:', error);
+      return { data: null, error: error as AuthError };
+    }
+  }
+
   // Sign out
   static async signOut(): Promise<{ error: AuthError | null }> {
     try {
