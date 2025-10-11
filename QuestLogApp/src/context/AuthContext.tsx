@@ -52,7 +52,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Listen for auth changes
     const { data: authListener } = AuthService.onAuthStateChange((event, session) => {
-      console.log('Auth state changed:', event);
+      console.log('🔄 Auth state changed:', event);
+      console.log('📝 Session details:', {
+        hasSession: !!session,
+        hasUser: !!session?.user,
+        userEmail: session?.user?.email,
+        userId: session?.user?.id,
+        provider: session?.user?.app_metadata?.provider,
+        event
+      });
       
       setSession(session);
       setUser(session?.user ?? null);

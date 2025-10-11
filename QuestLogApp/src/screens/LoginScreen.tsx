@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -41,7 +41,25 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onShowSignUp }) => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  useEffect(() => {
+    console.log('🏠 LoginScreen mounted');
+    console.log('🌐 Current URL:', window.location.href);
+    console.log('🔍 URL search params:', window.location.search);
+    
+    // Check if we're returning from OAuth
+    const urlParams = new URLSearchParams(window.location.search);
+    const accessToken = urlParams.get('access_token');
+    const refreshToken = urlParams.get('refresh_token');
+    
+    if (accessToken) {
+      console.log('🎉 OAuth tokens found in URL - successful OAuth return!');
+      console.log('✅ Access token present:', !!accessToken);
+      console.log('✅ Refresh token present:', !!refreshToken);
+    }
+  }, []);
+
   const handleBeginAdventure = () => {
+    console.log('🎮 Begin Adventure clicked - showing auth options');
     setShowAuthOptions('buttons');
   };
 
@@ -82,6 +100,54 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onShowSignUp }) => {
       Alert.alert(
         'Login Failed',
         'Invalid credentials or network error. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    console.log('🎯 Google login button clicked');
+    console.log('📱 Current platform:', Platform.OS);
+    console.log('🌐 User agent:', navigator?.userAgent || 'Unknown');
+    
+    setLoading(true);
+    try {
+      console.log('🚀 Initiating Google OAuth login...');
+      
+      const result = await AuthService.signInWithGoogle();
+      
+      if (result.error) {
+        console.error('❌ Google login failed:', result.error);
+        console.error('❌ Error details:', {
+          message: result.error.message,
+          status: result.error.status,
+          name: result.error.name
+        });
+        Alert.alert(
+          'Google Login Failed',
+          result.error.message || 'Failed to sign in with Google. Please try again.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        console.log('✅ Google OAuth initiated successfully');
+        console.log('📝 Result data:', result.data);
+        
+        // Check if we got a URL for redirection
+        if (result.data?.url) {
+          console.log('🔗 Redirecting to:', result.data.url);
+          window.location.href = result.data.url;
+        } else {
+          console.log('⚠️ No redirect URL received from OAuth');
+        }
+      }
+      
+    } catch (error) {
+      console.error('❌ Google login exception:', error);
+      Alert.alert(
+        'Google Login Failed',
+        'Failed to sign in with Google. Please try again.',
         [{ text: 'OK' }]
       );
     } finally {
@@ -147,6 +213,17 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onShowSignUp }) => {
                       onPress={onShowSignUp}
                     >
                       <Text style={styles.signupActionButtonText}>Sign Up</Text>
+                    </TouchableOpacity>
+
+                    {/* Google OAuth Button */}
+                    <TouchableOpacity
+                      style={[styles.googleButton, loading && styles.loginButtonLoading]}
+                      onPress={handleGoogleLogin}
+                      disabled={loading}
+                    >
+                      <Text style={styles.googleButtonText}>
+                        {loading ? 'Signing in...' : '🚀 Continue with Google'}
+                      </Text>
                     </TouchableOpacity>
                   </View>
                   
@@ -219,6 +296,17 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onShowSignUp }) => {
                     <Text style={styles.dividerText}>or</Text>
                     <View style={styles.dividerLine} />
                   </View>
+
+                  {/* Google Sign In Button */}
+                  <TouchableOpacity
+                    style={[styles.googleButton, loading && styles.loginButtonLoading]}
+                    onPress={handleGoogleLogin}
+                    disabled={loading}
+                  >
+                    <Text style={styles.googleButtonText}>
+                      {loading ? 'Signing in...' : '🚀 Continue with Google'}
+                    </Text>
+                  </TouchableOpacity>
 
                   {/* Sign Up Option */}
                   <TouchableOpacity
@@ -524,6 +612,26 @@ const styles = StyleSheet.create({
     marginHorizontal: RetroTheme.spacing.md,
     fontSize: 14,
     color: RetroTheme.colors.textMuted,
+    fontFamily: RetroTheme.fonts.primary,
+  },
+
+  // Google OAuth button
+  googleButton: {
+    width: '100%',
+    maxWidth: 300,
+    height: 48,
+    backgroundColor: '#4285F4', // Google Blue
+    borderRadius: RetroTheme.borderRadius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: RetroTheme.spacing.md,
+    ...RetroTheme.shadows.small,
+  },
+
+  googleButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
     fontFamily: RetroTheme.fonts.primary,
   },
 
