@@ -41,6 +41,14 @@
 
 ## Critical Implementation Paths
 
+### Authentication Flow
+1. **Entry Point**: LoginScreen with progressive disclosure (Begin Adventure button)
+2. **OAuth Option**: Google OAuth button with signInWithGoogle() service method
+3. **OAuth Process**: Supabase OAuth redirect → Google Console → Return with session
+4. **Session Management**: AuthContext provides global auth state with comprehensive logging
+5. **Protected Routes**: Auth state guards for authenticated-only screens
+6. **Fallback**: Email/password authentication available as alternative
+
 ### Game Logging Flow
 1. Search games (RAWG API + local cache)
 2. Select game → Pre-populate metadata
@@ -64,10 +72,14 @@
 ## Component Relationships
 ```
 App
-├── AuthProvider
+├── AuthProvider (AuthContext with comprehensive session logging)
 ├── ThemeProvider (Retro styling)
 ├── NavigationContainer
-│   ├── TabNavigator (Bottom tabs)
+│   ├── AuthFlow (Unauthenticated)
+│   │   ├── LoginScreen (Progressive disclosure + OAuth)
+│   │   ├── SignUpScreen (Email/password fallback)
+│   │   └── AuthSuccessScreen (OAuth return handling)
+│   ├── TabNavigator (Bottom tabs - Authenticated)
 │   │   ├── GameLibrary
 │   │   ├── QuestLog
 │   │   ├── Profile
@@ -77,9 +89,23 @@ App
 │       └── Settings
 ```
 
+## Service Layer Architecture
+
+### AuthService
+- **signInWithGoogle()**: Supabase OAuth integration with comprehensive logging
+- **signInWithEmail()**: Email/password authentication
+- **signUp()**: User registration handling
+- **signOut()**: Session cleanup and state reset
+
+### AuthContext
+- **Global State**: User session management across app
+- **Session Monitoring**: Real-time auth state changes with detailed logging
+- **Protected Routes**: Authentication guards for secure screens
+
 ## Performance Optimizations
 - **Lazy Loading**: Route-based code splitting
 - **Image Optimization**: WebP format, progressive loading
 - **List Virtualization**: FlatList for large datasets
 - **Memory Management**: Cleanup on unmount
 - **API Batching**: Combine related requests
+- **OAuth Caching**: Efficient session management and renewal
