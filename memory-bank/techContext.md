@@ -11,7 +11,9 @@
 
 ### Backend - Supabase
 - **Database**: PostgreSQL with RLS (Row Level Security)
-- **Authentication**: Built-in auth with social providers
+- **Authentication**: Email/password + Google OAuth with mobile-optimized flow
+- **OAuth Implementation**: WebBrowser.openAuthSessionAsync with manual session creation
+- **Mobile OAuth**: expo-auth-session and expo-web-browser for proper mobile OAuth handling
 - **Real-time**: Subscriptions for live updates
 - **Storage**: File uploads for user avatars, game screenshots
 - **Edge Functions**: Custom logic processing
@@ -49,6 +51,8 @@
   "react-native": "latest",
   "expo": "~49.0.0",
   "@supabase/supabase-js": "^2.x",
+  "expo-auth-session": "OAuth redirect handling",
+  "expo-web-browser": "Mobile OAuth browser integration", 
   "react-navigation": "^6.x",
   "react-native-reanimated": "^3.x",
   "react-dom": "web platform support",
