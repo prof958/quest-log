@@ -73,13 +73,18 @@
 
 ## Critical Implementation Paths
 
-### Authentication Flow
+### Mobile-Optimized Authentication Flow
 1. **Entry Point**: LoginScreen with progressive disclosure (Begin Adventure button)
-2. **OAuth Option**: Google OAuth button with signInWithGoogle() service method
-3. **OAuth Process**: Supabase OAuth redirect → Google Console → Return with session
-4. **Session Management**: AuthContext provides global auth state with comprehensive logging
-5. **Protected Routes**: Auth state guards for authenticated-only screens
+2. **OAuth Option**: Google OAuth button with mobile-optimized signInWithGoogle() method
+3. **Mobile OAuth Process**: 
+   - WebBrowser.openAuthSessionAsync() opens OAuth session (not regular browser)
+   - User authenticates with Google in OAuth session
+   - WebBrowser returns callback URL with tokens to app
+   - Manual session creation using QueryParams parsing and supabase.auth.setSession()
+4. **Session Management**: AuthContext provides global auth state with automatic session handling
+5. **Protected Routes**: Auth state guards for authenticated-only screens  
 6. **Fallback**: Email/password authentication available as alternative
+7. **Error Handling**: Clean error states without false failure popups
 
 ### Game Discovery & Selection Flow
 1. **Game Search**: IGDBService provides comprehensive search through 500k+ games from IGDB API
