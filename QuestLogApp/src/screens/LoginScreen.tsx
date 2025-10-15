@@ -14,6 +14,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { RetroTheme } from '../theme/RetroTheme';
 import { AuthService } from '../services/AuthService';
+import { useAuth } from '../context/AuthContext';
 
 // Simple gaming controller icon component
 const GameControllerIcon = () => (
@@ -33,6 +34,7 @@ interface LoginScreenProps {
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onShowSignUp }) => {
+  const { user, session } = useAuth();
   const [showAuthOptions, setShowAuthOptions] = useState<false | 'buttons' | 'login'>(false);
   const [formData, setFormData] = useState({
     email: '',
@@ -43,20 +45,32 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onShowSignUp }) => {
 
   useEffect(() => {
     console.log('🏠 LoginScreen mounted');
-    console.log('🌐 Current URL:', window.location.href);
-    console.log('🔍 URL search params:', window.location.search);
     
-    // Check if we're returning from OAuth
-    const urlParams = new URLSearchParams(window.location.search);
-    const accessToken = urlParams.get('access_token');
-    const refreshToken = urlParams.get('refresh_token');
-    
-    if (accessToken) {
-      console.log('🎉 OAuth tokens found in URL - successful OAuth return!');
-      console.log('✅ Access token present:', !!accessToken);
-      console.log('✅ Refresh token present:', !!refreshToken);
+    // Only access window object on web platform
+    if (Platform.OS === 'web') {
+      console.log('🌐 Current URL:', window.location.href);
+      console.log('🔍 URL search params:', window.location.search);
+      
+      // Check if we're returning from OAuth
+      const urlParams = new URLSearchParams(window.location.search);
+      const accessToken = urlParams.get('access_token');
+      const refreshToken = urlParams.get('refresh_token');
+      
+      if (accessToken) {
+        console.log('🎉 OAuth tokens found in URL - successful OAuth return!');
+        console.log('✅ Access token present:', !!accessToken);
+        console.log('✅ Refresh token present:', !!refreshToken);
+      }
     }
   }, []);
+
+  // Reset loading state when authentication completes (success or failure)
+  useEffect(() => {
+    if (user && session) {
+      console.log('🎉 Authentication successful - resetting loading state');
+      setLoading(false);
+    }
+  }, [user, session]);
 
   const handleBeginAdventure = () => {
     console.log('🎮 Begin Adventure clicked - showing auth options');
@@ -110,7 +124,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onShowSignUp }) => {
   const handleGoogleLogin = async () => {
     console.log('🎯 Google login button clicked');
     console.log('📱 Current platform:', Platform.OS);
-    console.log('🌐 User agent:', navigator?.userAgent || 'Unknown');
     
     setLoading(true);
     try {
@@ -120,27 +133,37 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onShowSignUp }) => {
       
       if (result.error) {
         console.error('❌ Google login failed:', result.error);
-        console.error('❌ Error details:', {
-          message: result.error.message,
-          status: result.error.status,
-          name: result.error.name
-        });
         Alert.alert(
           'Google Login Failed',
           result.error.message || 'Failed to sign in with Google. Please try again.',
           [{ text: 'OK' }]
         );
-      } else {
-        console.log('✅ Google OAuth initiated successfully');
-        console.log('📝 Result data:', result.data);
+        setLoading(false);
+      } else if (result.data) {
+        console.log('✅ Google OAuth completed successfully');
         
-        // Check if we got a URL for redirection
-        if (result.data?.url) {
-          console.log('🔗 Redirecting to:', result.data.url);
+        // Handle different response types
+        if (Platform.OS === 'web' && result.data.url) {
+          // Web: redirect to OAuth URL
+          console.log('🔗 Redirecting to OAuth URL');
           window.location.href = result.data.url;
+        } else if (result.data.session) {
+          // Mobile: OAuth completed with session
+          console.log('🎉 OAuth session created successfully!');
+          setLoading(false);
+          // AuthContext will handle the session automatically
         } else {
-          console.log('⚠️ No redirect URL received from OAuth');
+          console.log('⚠️ Unexpected OAuth response format');
+          setLoading(false);
         }
+      } else {
+        console.log('⚠️ No OAuth data received');
+        Alert.alert(
+          'Authentication Error',
+          'Failed to start authentication. Please try again.',
+          [{ text: 'OK' }]
+        );
+        setLoading(false);
       }
       
     } catch (error) {
@@ -150,7 +173,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onShowSignUp }) => {
         'Failed to sign in with Google. Please try again.',
         [{ text: 'OK' }]
       );
-    } finally {
       setLoading(false);
     }
   };

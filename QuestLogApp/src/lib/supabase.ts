@@ -1,4 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 // Get Supabase credentials from environment variables
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!
@@ -8,7 +10,15 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables. Please check your .env file.')
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// Create Supabase client with proper mobile configuration
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    storage: AsyncStorage,
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true, // Enable for both web AND mobile to handle OAuth redirects
+  },
+})
 
 // Types for our database
 export interface User {
