@@ -17,11 +17,12 @@
 - **Edge Functions**: Custom logic processing
 
 ### Game Data Strategy
-- **Local Database**: JSON file with curated popular games (20+ titles)
-- **LocalGameService**: Custom service providing IGDB-compatible interface
-- **No External APIs**: Eliminates CORS issues, rate limits, and network dependencies
-- **Instant Performance**: All game searches and data access are synchronous
-- **Offline First**: Complete functionality without internet connection
+- **IGDB API Integration**: Comprehensive gaming database (500k+ games) via Twitch OAuth
+- **Supabase Edge Functions**: Serverless proxy (`igdb-proxy`) handling authentication and CORS
+- **IGDBService**: Full-featured service with caching, error handling, and mobile optimization
+- **UserRatingService**: Separate user rating system with community reviews and library management
+- **Intelligent Caching**: Multi-layer cache system with TTL management for offline support
+- **Rate Limit Compliance**: Built-in handling of IGDB's 4 requests/second limit
 
 ## Development Environment
 - **Package Manager**: npm/yarn
@@ -50,15 +51,23 @@
 }
 ```
 
+## Infrastructure Setup
+- **Supabase Project**: Database, Auth, and Edge Functions deployed
+- **IGDB Credentials**: Twitch OAuth configured with Edge Function secrets
+- **Database Schema**: User rating tables with RLS policies deployed
+- **Edge Function**: `igdb-proxy` deployed and configured for IGDB API access
+
 ## Local Development Setup
 - **Node.js**: Required for npm and development tools
-- **Web Testing**: http://localhost:8081 for browser-based testing
+- **Supabase CLI**: For Edge Function deployment and management
+- **Web Testing**: http://localhost:8081 for browser-based testing  
 - **Mobile Testing**: Expo Go app for device testing
-- **No Server Dependencies**: All game data served from local JSON files
+- **Environment Variables**: IGDB credentials and Supabase configuration
 
 ## Development Workflow
 - **Environment**: Local development with Expo Go
-- **Database**: Supabase local development setup
+- **Database**: Supabase cloud database with local development
+- **Edge Functions**: Deployed to Supabase for IGDB API integration
 - **Deployment**: EAS Build for production apps
-- **Version Control**: Git with conventional commits
+- **Version Control**: Git with conventional commits and memory bank updates
 - **Documentation**: README + inline code comments
