@@ -103,8 +103,13 @@ const GameSearchScreen: React.FC<GameSearchScreenProps> = ({ onGameSelect, onBac
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingPopular, setIsLoadingPopular] = useState(true);
   const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [showCacheStats, setShowCacheStats] = useState(false);
 
   const igdbService = IGDBService.getInstance();
+
+  const getCacheStats = () => {
+    return igdbService.getCacheStats();
+  };
 
   useEffect(() => {
     loadPopularGames();
@@ -196,7 +201,42 @@ const GameSearchScreen: React.FC<GameSearchScreenProps> = ({ onGameSelect, onBac
         )}
         <Text style={styles.title}>Search Games (IGDB)</Text>
         <Text style={styles.subtitle}>500k+ games database</Text>
+        
+        {/* Cache Stats Toggle */}
+        <TouchableOpacity 
+          style={styles.cacheStatsToggle} 
+          onPress={() => setShowCacheStats(!showCacheStats)}
+        >
+          <Text style={styles.cacheStatsToggleText}>
+            📊 Cache: {getCacheStats().hitRate}%
+          </Text>
+        </TouchableOpacity>
       </View>
+
+      {/* Cache Stats Panel */}
+      {showCacheStats && (
+        <View style={styles.cacheStatsPanel}>
+          <Text style={styles.cacheStatsTitle}>Cache Performance</Text>
+          <View style={styles.cacheStatsGrid}>
+            <View style={styles.cacheStat}>
+              <Text style={styles.cacheStatValue}>{getCacheStats().hitRate}%</Text>
+              <Text style={styles.cacheStatLabel}>Hit Rate</Text>
+            </View>
+            <View style={styles.cacheStat}>
+              <Text style={styles.cacheStatValue}>{getCacheStats().avgResponseTime}ms</Text>
+              <Text style={styles.cacheStatLabel}>Avg Response</Text>
+            </View>
+            <View style={styles.cacheStat}>
+              <Text style={styles.cacheStatValue}>{getCacheStats().totalRequests}</Text>
+              <Text style={styles.cacheStatLabel}>Requests</Text>
+            </View>
+            <View style={styles.cacheStat}>
+              <Text style={styles.cacheStatValue}>{getCacheStats().efficiency}</Text>
+              <Text style={styles.cacheStatLabel}>Efficiency</Text>
+            </View>
+          </View>
+        </View>
+      )}
 
       {/* Search Input */}
       <View style={styles.searchContainer}>
@@ -402,6 +442,52 @@ const styles = {
   },
   emptyStateSubtext: {
     fontSize: 14,
+    color: RetroTheme.colors.textSecondary,
+    textAlign: 'center' as const,
+  },
+  // Cache Stats Styles
+  cacheStatsToggle: {
+    backgroundColor: RetroTheme.colors.primary,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    marginTop: 4,
+  },
+  cacheStatsToggleText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold' as const,
+  },
+  cacheStatsPanel: {
+    backgroundColor: RetroTheme.colors.surface,
+    borderWidth: 1,
+    borderColor: RetroTheme.colors.border,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    borderRadius: 8,
+    padding: 12,
+  },
+  cacheStatsTitle: {
+    fontSize: 14,
+    fontWeight: 'bold' as const,
+    color: RetroTheme.colors.text,
+    marginBottom: 8,
+    textAlign: 'center' as const,
+  },
+  cacheStatsGrid: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-around' as const,
+  },
+  cacheStat: {
+    alignItems: 'center' as const,
+  },
+  cacheStatValue: {
+    fontSize: 16,
+    fontWeight: 'bold' as const,
+    color: RetroTheme.colors.primary,
+  },
+  cacheStatLabel: {
+    fontSize: 10,
     color: RetroTheme.colors.textSecondary,
     textAlign: 'center' as const,
   },

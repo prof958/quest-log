@@ -1,7 +1,7 @@
 /**
  * IGDB Game Service
  * Uses Supabase Edge Function as proxy to access IGDB API
- * Provides comprehensive game data with user ratings integration
+ * Provides comprehensive game data with enhanced caching system
  */
 
 // IGDB Game interface matching IGDB API response
@@ -73,12 +73,21 @@ interface IGDBRequest {
 
 /**
  * IGDB Service for comprehensive game data
- * Uses Supabase Edge Function to bypass CORS and handle authentication
+ * Uses Supabase Edge Function with enhanced database caching
  */
 export class IGDBService {
   private static instance: IGDBService;
   private cache = new Map<string, CacheEntry<any>>();
   private supabaseUrl: string;
+  
+  // Cache performance tracking
+  private cacheStats = {
+    hits: 0,
+    misses: 0,
+    requests: 0,
+    serverCacheHits: 0,
+    totalResponseTime: 0
+  };
   
   constructor() {
     this.supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_IGDB_FUNCTION_URL || '';
@@ -94,6 +103,50 @@ export class IGDBService {
     return IGDBService.instance;
   }
 
+  /**
+   * Get comprehensive cache performance statistics
+   */
+  public getCacheStats() {
+    const totalHits = this.cacheStats.hits + this.cacheStats.serverCacheHits;
+    const hitRate = this.cacheStats.requests > 0 
+      ? (totalHits / this.cacheStats.requests * 100).toFixed(1)
+      : '0';
+    
+    const avgResponseTime = this.cacheStats.requests > 0
+      ? Math.round(this.cacheStats.totalResponseTime / this.cacheStats.requests)
+      : 0;
+
+    return {
+      ...this.cacheStats,
+      hitRate,
+      avgResponseTime,
+      totalRequests: this.cacheStats.requests,
+      clientCacheHitRate: this.cacheStats.requests > 0 
+        ? (this.cacheStats.hits / this.cacheStats.requests * 100).toFixed(1) 
+        : '0',
+      serverCacheHitRate: this.cacheStats.requests > 0 
+        ? (this.cacheStats.serverCacheHits / this.cacheStats.requests * 100).toFixed(1) 
+        : '0',
+      localCacheSize: this.cache.size,
+      efficiency: totalHits > 0 ? 'Excellent' : this.cacheStats.requests < 5 ? 'Building' : 'Poor'
+    };
+  }
+
+  /**
+   * Clear local cache
+   */
+  public clearCache(): void {
+    this.cache.clear();
+    this.cacheStats = {
+      hits: 0,
+      misses: 0,
+      requests: 0,
+      serverCacheHits: 0,
+      totalResponseTime: 0
+    };
+    console.log('Local IGDB cache and stats cleared');
+  }
+
   private getCacheKey(endpoint: string, body: string): string {
     return `${endpoint}_${body}`;
   }
@@ -102,7 +155,7 @@ export class IGDBService {
     return Date.now() < entry.expiry;
   }
 
-  private setCache<T>(key: string, data: T, ttlMinutes: number = 60): void {
+  private setCache<T>(key: string, data: T, ttlMinutes: number = 30): void {
     const entry: CacheEntry<T> = {
       data,
       timestamp: Date.now(),
@@ -120,15 +173,21 @@ export class IGDBService {
   }
 
   /**
-   * Make a request to IGDB via Supabase Edge Function
+   * Make a request to IGDB via Supabase Edge Function with enhanced caching
    */
   private async makeIGDBRequest<T>(endpoint: string, body: string): Promise<T> {
+    const startTime = Date.now();
+    this.cacheStats.requests++;
+    
     const cacheKey = this.getCacheKey(endpoint, body);
     
-    // Check cache first
+    // Check local cache first
     const cached = this.getCache<T>(cacheKey);
     if (cached) {
-      console.log(`Cache hit for ${endpoint}`);
+      this.cacheStats.hits++;
+      const responseTime = Date.now() - startTime;
+      this.cacheStats.totalResponseTime += responseTime;
+      console.log(`Client cache hit for ${endpoint} (${responseTime}ms)`);
       return cached;
     }
 
@@ -159,237 +218,219 @@ export class IGDBService {
       }
 
       const data = await response.json();
+      const responseTime = Date.now() - startTime;
+      this.cacheStats.totalResponseTime += responseTime;
       
-      // Cache successful responses
-      this.setCache(cacheKey, data, 60); // Cache for 1 hour
+      // Check if this was a server cache hit
+      const cacheStatus = response.headers.get('X-Cache');
+      const serverCacheKey = response.headers.get('X-Cache-Key');
+      const queueSize = response.headers.get('X-Queue-Size');
       
+      if (cacheStatus === 'HIT') {
+        this.cacheStats.serverCacheHits++;
+        console.log(`Server cache hit for ${endpoint} (${responseTime}ms, key: ${serverCacheKey})`);
+      } else {
+        this.cacheStats.misses++;
+        console.log(`API call for ${endpoint} (${responseTime}ms, key: ${serverCacheKey}, queue: ${queueSize || 0})`);
+      }
+      
+      // Cache successful responses locally for faster future access
+      this.setCache(cacheKey, data, 30); // Local cache for 30 minutes
+
       return data;
     } catch (error) {
-      console.error('IGDB request failed:', error);
+      console.error(`Error making IGDB request to ${endpoint}:`, error);
       throw error;
     }
   }
 
   /**
-   * Search games by name
+   * Transform IGDB cover URL to get different sizes
    */
-  public async searchGames(query: string, limit: number = 20): Promise<IGDBGame[]> {
-    if (!query.trim()) {
-      return [];
-    }
+  private transformImageUrl(imageId: string, size: 'thumb' | 'cover_small' | 'cover_big' | 'screenshot_med' | 'screenshot_big' | '1080p' = 'cover_big'): string {
+    return `https://images.igdb.com/igdb/image/upload/t_${size}/${imageId}.jpg`;
+  }
 
-    const body = `
+  /**
+   * Search for games by name
+   */
+  public async searchGames(query: string, limit: number = 10): Promise<IGDBGame[]> {
+    const searchQuery = `
       search "${query}";
-      fields name,summary,rating,first_release_date,cover.image_id,genres.name,platforms.name,involved_companies.company.name,involved_companies.developer,involved_companies.publisher;
-      where version_parent = null;
+      fields name,summary,rating,rating_count,first_release_date,cover.image_id,genres.name,platforms.name;
       limit ${limit};
-    `.trim();
+    `;
 
     try {
-      const games = await this.makeIGDBRequest<IGDBGame[]>('games', body);
-      return this.processGames(games);
+      const games = await this.makeIGDBRequest<IGDBGame[]>('games', searchQuery);
+      
+      return games.map(game => ({
+        ...game,
+        cover: game.cover ? {
+          ...game.cover,
+          url: this.transformImageUrl(game.cover.image_id, 'cover_big')
+        } : undefined
+      }));
     } catch (error) {
-      console.error('Search failed:', error);
-      throw new Error('Failed to search games. Please try again.');
+      console.error('Error searching games:', error);
+      throw new Error('Failed to search games');
     }
   }
 
   /**
-   * Get popular/trending games
+   * Get popular games (high rating and rating count)
    */
   public async getPopularGames(limit: number = 20): Promise<IGDBGame[]> {
-    const body = `
-      fields name,summary,rating,rating_count,first_release_date,cover.image_id,genres.name,platforms.name,involved_companies.company.name,involved_companies.developer,involved_companies.publisher;
-      where rating >= 75 & rating_count >= 10 & version_parent = null;
-      sort rating_count desc;
+    const popularQuery = `
+      fields name,summary,rating,rating_count,first_release_date,cover.image_id,genres.name,platforms.name;
+      where rating >= 80 & rating_count >= 100;
+      sort rating desc;
       limit ${limit};
-    `.trim();
+    `;
 
     try {
-      const games = await this.makeIGDBRequest<IGDBGame[]>('games', body);
-      return this.processGames(games);
+      const games = await this.makeIGDBRequest<IGDBGame[]>('games', popularQuery);
+      
+      return games.map(game => ({
+        ...game,
+        cover: game.cover ? {
+          ...game.cover,
+          url: this.transformImageUrl(game.cover.image_id, 'cover_big')
+        } : undefined
+      }));
     } catch (error) {
-      console.error('Failed to get popular games:', error);
-      // Return empty array instead of throwing to provide graceful fallback
-      return [];
+      console.error('Error fetching popular games:', error);
+      throw new Error('Failed to fetch popular games');
     }
   }
 
   /**
-   * Get game by ID with detailed information
+   * Get trending games (recently released with good ratings)
    */
-  public async getGameById(id: number): Promise<IGDBGame | null> {
-    const body = `
+  public async getTrendingGames(limit: number = 15): Promise<IGDBGame[]> {
+    const sixMonthsAgo = Math.floor((Date.now() - (6 * 30 * 24 * 60 * 60 * 1000)) / 1000);
+    
+    const trendingQuery = `
+      fields name,summary,rating,rating_count,first_release_date,cover.image_id,genres.name,platforms.name;
+      where first_release_date >= ${sixMonthsAgo} & rating >= 70;
+      sort first_release_date desc;
+      limit ${limit};
+    `;
+
+    try {
+      const games = await this.makeIGDBRequest<IGDBGame[]>('games', trendingQuery);
+      
+      return games.map(game => ({
+        ...game,
+        cover: game.cover ? {
+          ...game.cover,
+          url: this.transformImageUrl(game.cover.image_id, 'cover_big')
+        } : undefined
+      }));
+    } catch (error) {
+      console.error('Error fetching trending games:', error);
+      throw new Error('Failed to fetch trending games');
+    }
+  }
+
+  /**
+   * Get detailed game information by ID
+   */
+  public async getGameDetails(gameId: number): Promise<IGDBGame> {
+    const detailsQuery = `
       fields name,summary,storyline,rating,rating_count,first_release_date,
              cover.image_id,screenshots.image_id,artworks.image_id,
              genres.name,platforms.name,game_modes.name,
              involved_companies.company.name,involved_companies.developer,involved_companies.publisher,
              release_dates.date,release_dates.platform.name,release_dates.region,
              videos.name,videos.video_id,age_ratings.category,age_ratings.rating;
-      where id = ${id};
-    `.trim();
+      where id = ${gameId};
+    `;
 
     try {
-      const games = await this.makeIGDBRequest<IGDBGame[]>('games', body);
-      if (games && games.length > 0) {
-        return this.processGames(games)[0];
+      const games = await this.makeIGDBRequest<IGDBGame[]>('games', detailsQuery);
+      
+      if (!games || games.length === 0) {
+        throw new Error('Game not found');
       }
-      return null;
+
+      const game = games[0];
+      
+      return {
+        ...game,
+        cover: game.cover ? {
+          ...game.cover,
+          url: this.transformImageUrl(game.cover.image_id, 'cover_big')
+        } : undefined,
+        screenshots: game.screenshots?.map(screenshot => ({
+          ...screenshot,
+          url: this.transformImageUrl(screenshot.image_id, 'screenshot_big')
+        })),
+        artworks: game.artworks?.map(artwork => ({
+          ...artwork,
+          url: this.transformImageUrl(artwork.image_id, '1080p')
+        }))
+      };
     } catch (error) {
-      console.error(`Failed to get game ${id}:`, error);
-      return null;
+      console.error(`Error fetching game details for ID ${gameId}:`, error);
+      throw new Error('Failed to fetch game details');
     }
   }
 
   /**
-   * Get games by multiple IDs
+   * Get games by genre
    */
-  public async getGamesByIds(ids: number[]): Promise<IGDBGame[]> {
-    if (ids.length === 0) return [];
-
-    const body = `
-      fields name,summary,rating,first_release_date,cover.image_id,genres.name,platforms.name,involved_companies.company.name,involved_companies.developer,involved_companies.publisher;
-      where id = (${ids.join(',')});
-    `.trim();
-
-    try {
-      const games = await this.makeIGDBRequest<IGDBGame[]>('games', body);
-      return this.processGames(games);
-    } catch (error) {
-      console.error('Failed to get games by IDs:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Get all available genres
-   */
-  public async getAllGenres(): Promise<Array<{ id: number; name: string }>> {
-    const body = `
-      fields name;
-      sort name asc;
-      limit 500;
-    `.trim();
-
-    try {
-      return await this.makeIGDBRequest<Array<{ id: number; name: string }>>('genres', body);
-    } catch (error) {
-      console.error('Failed to get genres:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Get all available platforms
-   */
-  public async getAllPlatforms(): Promise<Array<{ id: number; name: string }>> {
-    const body = `
-      fields name;
-      sort name asc;
-      limit 500;
-    `.trim();
-
-    try {
-      return await this.makeIGDBRequest<Array<{ id: number; name: string }>>('platforms', body);
-    } catch (error) {
-      console.error('Failed to get platforms:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Search games with advanced filters
-   */
-  public async searchGamesAdvanced(options: {
-    query?: string;
-    genres?: number[];
-    platforms?: number[];
-    minRating?: number;
-    limit?: number;
-  }): Promise<IGDBGame[]> {
-    const { query, genres, platforms, minRating, limit = 20 } = options;
-    
-    let whereClause = 'version_parent = null';
-    
-    if (genres && genres.length > 0) {
-      whereClause += ` & genres = (${genres.join(',')})`;
-    }
-    
-    if (platforms && platforms.length > 0) {
-      whereClause += ` & platforms = (${platforms.join(',')})`;
-    }
-    
-    if (minRating) {
-      whereClause += ` & rating >= ${minRating}`;
-    }
-
-    let body = `
-      fields name,summary,rating,first_release_date,cover.image_id,genres.name,platforms.name,involved_companies.company.name,involved_companies.developer,involved_companies.publisher;
-      where ${whereClause};
+  public async getGamesByGenre(genreName: string, limit: number = 20): Promise<IGDBGame[]> {
+    const genreQuery = `
+      fields name,summary,rating,rating_count,first_release_date,cover.image_id,genres.name,platforms.name;
+      where genres.name ~ "${genreName}" & rating >= 60;
       sort rating desc;
       limit ${limit};
-    `.trim();
-
-    if (query && query.trim()) {
-      body = `
-        search "${query}";
-        ${body}
-      `.trim();
-    }
+    `;
 
     try {
-      const games = await this.makeIGDBRequest<IGDBGame[]>('games', body);
-      return this.processGames(games);
+      const games = await this.makeIGDBRequest<IGDBGame[]>('games', genreQuery);
+      
+      return games.map(game => ({
+        ...game,
+        cover: game.cover ? {
+          ...game.cover,
+          url: this.transformImageUrl(game.cover.image_id, 'cover_big')
+        } : undefined
+      }));
     } catch (error) {
-      console.error('Advanced search failed:', error);
-      return [];
+      console.error(`Error fetching games by genre ${genreName}:`, error);
+      throw new Error('Failed to fetch games by genre');
     }
   }
 
   /**
-   * Process games data and format image URLs
+   * Get upcoming games
    */
-  private processGames(games: IGDBGame[]): IGDBGame[] {
-    return games.map(game => ({
-      ...game,
-      cover: game.cover ? {
-        ...game.cover,
-        url: this.formatImageUrl(game.cover.image_id, 'cover_big'),
-      } : undefined,
-      screenshots: game.screenshots?.map(screenshot => ({
-        ...screenshot,
-        url: this.formatImageUrl(screenshot.image_id, 'screenshot_med'),
-      })),
-      artworks: game.artworks?.map(artwork => ({
-        ...artwork,
-        url: this.formatImageUrl(artwork.image_id, 'screenshot_big'),
-      })),
-    }));
-  }
+  public async getUpcomingGames(limit: number = 15): Promise<IGDBGame[]> {
+    const now = Math.floor(Date.now() / 1000);
+    
+    const upcomingQuery = `
+      fields name,summary,rating,first_release_date,cover.image_id,genres.name,platforms.name;
+      where first_release_date > ${now};
+      sort first_release_date asc;
+      limit ${limit};
+    `;
 
-  /**
-   * Format IGDB image URL with proper size
-   */
-  private formatImageUrl(imageId: string, size: string = 'cover_big'): string {
-    return `https://images.igdb.com/igdb/image/upload/t_${size}/${imageId}.jpg`;
-  }
-
-  /**
-   * Clear cache (useful for testing or memory management)
-   */
-  public clearCache(): void {
-    this.cache.clear();
-    console.log('IGDB cache cleared');
-  }
-
-  /**
-   * Get cache statistics
-   */
-  public getCacheStats(): { size: number; entries: string[] } {
-    return {
-      size: this.cache.size,
-      entries: Array.from(this.cache.keys()),
-    };
+    try {
+      const games = await this.makeIGDBRequest<IGDBGame[]>('games', upcomingQuery);
+      
+      return games.map(game => ({
+        ...game,
+        cover: game.cover ? {
+          ...game.cover,
+          url: this.transformImageUrl(game.cover.image_id, 'cover_big')
+        } : undefined
+      }));
+    } catch (error) {
+      console.error('Error fetching upcoming games:', error);
+      throw new Error('Failed to fetch upcoming games');
+    }
   }
 }
 
