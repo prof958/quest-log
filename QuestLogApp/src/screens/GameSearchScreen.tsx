@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, TextInput, FlatList, TouchableOpacity, Image, ActivityIndicator, Alert } from 'react-native';
 import { RetroTheme } from '../theme/RetroTheme';
 import IGDBService, { IGDBGame } from '../services/IGDBService';
@@ -14,13 +14,25 @@ interface GameItemProps {
 }
 
 const GameItem: React.FC<GameItemProps> = ({ game, onSelect }) => {
-  const getCoverUrl = () => {
+  const [imageLoading, setImageLoading] = useState(true);
+  const [imageError, setImageError] = useState(false);
+
+  const coverUrl = useMemo(() => {
     if (game.cover?.url) {
-      // IGDB service already provides formatted URLs
-      return game.cover.url;
+      // IGDB service already provides formatted URLs - optimize for faster loading
+      return game.cover.url.replace('t_cover_big', 't_cover_small');
     }
     return null;
-  };
+  }, [game.cover?.url]);
+
+  const handleImageLoadStart = useCallback(() => setImageLoading(true), []);
+  const handleImageLoadEnd = useCallback(() => setImageLoading(false), []);
+  const handleImageError = useCallback(() => {
+    setImageError(true);
+    setImageLoading(false);
+  }, []);
+
+  const handlePress = useCallback(() => onSelect(game), [game, onSelect]);
 
   const getGenres = () => {
     if (game.genres && game.genres.length > 0) {
@@ -47,18 +59,31 @@ const GameItem: React.FC<GameItemProps> = ({ game, onSelect }) => {
   return (
     <TouchableOpacity
       style={styles.gameItem}
-      onPress={() => onSelect(game)}
+      onPress={handlePress}
       activeOpacity={0.8}
     >
       <View style={styles.gameItemContent}>
         {/* Game Cover */}
         <View style={styles.coverContainer}>
-          {getCoverUrl() ? (
-            <Image
-              source={{ uri: getCoverUrl()! }}
-              style={styles.gameCover}
-              resizeMode="cover"
-            />
+          {coverUrl && !imageError ? (
+            <>
+              <Image
+                source={{ uri: coverUrl }}
+                style={styles.gameCover}
+                resizeMode="cover"
+                onLoadStart={handleImageLoadStart}
+                onLoadEnd={handleImageLoadEnd}
+                onError={handleImageError}
+                // Performance optimizations
+                loadingIndicatorSource={{ uri: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7' }}
+                fadeDuration={200}
+              />
+              {imageLoading && (
+                <View style={styles.imageLoader}>
+                  <ActivityIndicator size="small" color={RetroTheme.colors.primary} />
+                </View>
+              )}
+            </>
           ) : (
             <View style={styles.placeholderCover}>
               <Text style={styles.placeholderText}>🎮</Text>
@@ -172,14 +197,19 @@ const GameSearchScreen: React.FC<GameSearchScreenProps> = ({ onGameSelect, onBac
     // Clear existing timeout
     if (searchTimeout) {
       clearTimeout(searchTimeout);
+      setSearchTimeout(null);
     }
 
-    // Set new timeout for debounced search
-    const timeout = setTimeout(() => {
-      performSearch(text);
-    }, 500);
-    
-    setSearchTimeout(timeout);
+    // Clear search results when input is empty
+    if (!text.trim()) {
+      setSearchResults([]);
+    }
+  };
+
+  const handleSearchSubmit = () => {
+    if (searchQuery.trim()) {
+      performSearch(searchQuery.trim());
+    }
   };
 
   const handleGameSelect = (game: IGDBGame) => {
@@ -242,13 +272,14 @@ const GameSearchScreen: React.FC<GameSearchScreenProps> = ({ onGameSelect, onBac
       <View style={styles.searchContainer}>
         <TextInput
           style={styles.searchInput}
-          placeholder="Search for games..."
+          placeholder="Search for games... (Press Enter to search)"
           placeholderTextColor={RetroTheme.colors.textSecondary}
           value={searchQuery}
           onChangeText={handleSearchChange}
+          onSubmitEditing={handleSearchSubmit}
           autoCorrect={false}
           returnKeyType="search"
-          onSubmitEditing={() => performSearch(searchQuery)}
+          clearButtonMode="while-editing"
         />
         {(isLoading || isLoadingPopular) && (
           <ActivityIndicator 
@@ -378,6 +409,17 @@ const styles = {
     borderRadius: 4,
     justifyContent: 'center' as const,
     alignItems: 'center' as const,
+  },
+  imageLoader: {
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    borderRadius: 4,
   },
   placeholderText: {
     fontSize: 24,

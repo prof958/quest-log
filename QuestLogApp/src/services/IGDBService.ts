@@ -79,6 +79,7 @@ export class IGDBService {
   private static instance: IGDBService;
   private cache = new Map<string, CacheEntry<any>>();
   private supabaseUrl: string;
+  private pendingRequests = new Map<string, Promise<any>>();
   
   // Cache performance tracking
   private cacheStats = {
@@ -86,7 +87,8 @@ export class IGDBService {
     misses: 0,
     requests: 0,
     serverCacheHits: 0,
-    totalResponseTime: 0
+    totalResponseTime: 0,
+    duplicateRequestsAvoided: 0
   };
   
   constructor() {
@@ -137,12 +139,14 @@ export class IGDBService {
    */
   public clearCache(): void {
     this.cache.clear();
+    this.pendingRequests.clear();
     this.cacheStats = {
       hits: 0,
       misses: 0,
       requests: 0,
       serverCacheHits: 0,
-      totalResponseTime: 0
+      totalResponseTime: 0,
+      duplicateRequestsAvoided: 0
     };
     console.log('Local IGDB cache and stats cleared');
   }
@@ -173,7 +177,7 @@ export class IGDBService {
   }
 
   /**
-   * Make a request to IGDB via Supabase Edge Function with enhanced caching
+   * Make a request to IGDB via Supabase Edge Function with enhanced caching and deduplication
    */
   private async makeIGDBRequest<T>(endpoint: string, body: string): Promise<T> {
     const startTime = Date.now();
@@ -191,6 +195,14 @@ export class IGDBService {
       return cached;
     }
 
+    // Check if the same request is already pending (deduplication)
+    const pendingRequest = this.pendingRequests.get(cacheKey);
+    if (pendingRequest) {
+      this.cacheStats.duplicateRequestsAvoided++;
+      console.log(`Duplicate request avoided for ${endpoint}`);
+      return pendingRequest as Promise<T>;
+    }
+
     if (!this.supabaseUrl) {
       throw new Error('IGDB proxy URL not configured');
     }
@@ -201,47 +213,58 @@ export class IGDBService {
       method: 'POST'
     };
 
-    try {
-      console.log(`Making IGDB request to ${endpoint}: ${body}`);
-      
-      const response = await fetch(this.supabaseUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(request),
-      });
+    // Create and store the promise to avoid duplicate requests
+    const requestPromise = (async (): Promise<T> => {
+      try {
+        console.log(`Making IGDB request to ${endpoint}: ${body}`);
+        
+        const response = await fetch(this.supabaseUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(request),
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(`IGDB proxy error: ${response.status} - ${errorData.error || response.statusText}`);
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(`IGDB proxy error: ${response.status} - ${errorData.error || response.statusText}`);
+        }
+
+        const data = await response.json();
+        const responseTime = Date.now() - startTime;
+        this.cacheStats.totalResponseTime += responseTime;
+        
+        // Check if this was a server cache hit
+        const cacheStatus = response.headers.get('X-Cache');
+        const serverCacheKey = response.headers.get('X-Cache-Key');
+        const queueSize = response.headers.get('X-Queue-Size');
+        
+        if (cacheStatus === 'HIT') {
+          this.cacheStats.serverCacheHits++;
+          console.log(`Server cache hit for ${endpoint} (${responseTime}ms, key: ${serverCacheKey})`);
+        } else {
+          this.cacheStats.misses++;
+          console.log(`API call for ${endpoint} (${responseTime}ms, key: ${serverCacheKey}, queue: ${queueSize || 0})`);
+        }
+        
+        // Cache successful responses locally for faster future access
+        this.setCache(cacheKey, data, 30); // Local cache for 30 minutes
+
+        return data;
+      } catch (error) {
+        console.error(`Error making IGDB request to ${endpoint}:`, error);
+        throw error;
+      } finally {
+        // Always clean up the pending request
+        this.pendingRequests.delete(cacheKey);
       }
+    })();
 
-      const data = await response.json();
-      const responseTime = Date.now() - startTime;
-      this.cacheStats.totalResponseTime += responseTime;
-      
-      // Check if this was a server cache hit
-      const cacheStatus = response.headers.get('X-Cache');
-      const serverCacheKey = response.headers.get('X-Cache-Key');
-      const queueSize = response.headers.get('X-Queue-Size');
-      
-      if (cacheStatus === 'HIT') {
-        this.cacheStats.serverCacheHits++;
-        console.log(`Server cache hit for ${endpoint} (${responseTime}ms, key: ${serverCacheKey})`);
-      } else {
-        this.cacheStats.misses++;
-        console.log(`API call for ${endpoint} (${responseTime}ms, key: ${serverCacheKey}, queue: ${queueSize || 0})`);
-      }
-      
-      // Cache successful responses locally for faster future access
-      this.setCache(cacheKey, data, 30); // Local cache for 30 minutes
-
-      return data;
-    } catch (error) {
-      console.error(`Error making IGDB request to ${endpoint}:`, error);
-      throw error;
-    }
+    // Store the promise for deduplication
+    this.pendingRequests.set(cacheKey, requestPromise);
+    
+    return requestPromise;
   }
 
   /**
