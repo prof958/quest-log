@@ -3,20 +3,34 @@
 ## Architecture Overview
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   React Native  │────│    Supabase      │    │   Local Game    │
-│   (Frontend)    │    │  (User Data)     │    │   Database      │
-└─────────────────┘    └──────────────────┘    │ (popular-games  │
-        │                        │             │     .json)      │
-        │              ┌─────────────────┐     └─────────────────┘
-        └──────────────│ LocalGameService│             │
-                       │  (Game Search)  │─────────────┘
+│   React Native  │────│    Supabase      │────│ Supabase Edge   │
+│   (Frontend)    │    │ (User Data &     │    │   Functions     │
+│                 │    │  Authentication) │    │  (IGDB Proxy)   │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+        │                        │                        │
+        │                        │                        │
+        │              ┌─────────────────┐                │
+        │              │ User Rating     │                │
+        │              │ System Tables   │                │
+        │              └─────────────────┘                │
+        │                                                 │
+        │              ┌─────────────────┐                │
+        └──────────────│   IGDBService   │────────────────┘
+                       │ (Game Search &  │
+                       │  Data Access)   │
+                       └─────────────────┘
+                                │
+                       ┌─────────────────┐
+                       │   IGDB API      │
+                       │ (500k+ Games)   │
                        └─────────────────┘
 ```
 
-**Local-First Architecture**: 
-- Game data served from local JSON database for instant performance
-- User data (libraries, progress) stored in Supabase for persistence
-- No external API dependencies for core game search functionality
+**Hybrid Cloud Architecture**: 
+- Game data from IGDB API (500k+ games) via Supabase Edge Functions proxy
+- User data (ratings, libraries, progress) stored in Supabase with RLS policies
+- Edge Function handles CORS restrictions and API authentication
+- Comprehensive caching system for optimal mobile performance
 
 ## Key Design Patterns
 
@@ -55,18 +69,22 @@
 6. **Fallback**: Email/password authentication available as alternative
 
 ### Game Discovery & Selection Flow
-1. **Game Search**: LocalGameService provides instant search from local JSON database
-2. **Popular Games**: Curated list of 20+ games with rich metadata (ratings, genres, platforms)
-3. **Game Selection**: Choose from search results or popular games
-4. **Library Addition**: Save to user's personal game library via Supabase
-5. **Status Tracking**: Mark games as wishlist, playing, completed, etc.
+1. **Game Search**: IGDBService provides comprehensive search through 500k+ games from IGDB API
+2. **Popular Games**: Dynamic popular games list based on IGDB ratings and user community ratings
+3. **Advanced Search**: Filter by genres, platforms, ratings, release dates via IGDB API
+4. **Game Selection**: Choose from search results with rich metadata (cover art, screenshots, ratings)
+5. **Library Addition**: Save to user's personal game library with status tracking via Supabase
+6. **User Ratings**: Community-driven rating system separate from IGDB professional ratings
+7. **Status Tracking**: Mark games as not_played, playing, completed, dropped, plan_to_play
 
 ### Game Database Pattern
-- **Local JSON**: `src/data/popular-games.json` contains curated game collection
-- **Service Layer**: `LocalGameService` provides IGDB-compatible interface
-- **Search Functionality**: Title-based search with instant results
-- **Metadata Structure**: ID, name, summary, rating, genres, platforms, cover art
-- **Performance**: Zero latency, no network dependencies, mobile-optimized
+- **IGDB API**: Comprehensive gaming database with 500k+ games via Twitch authentication
+- **Supabase Edge Function**: `igdb-proxy` handles API authentication and CORS restrictions
+- **Service Layer**: `IGDBService` provides comprehensive game data access with caching
+- **Search Functionality**: Advanced search with filters (genres, platforms, ratings, release dates)
+- **Metadata Structure**: Rich game data (name, summary, cover art, screenshots, videos, companies, ratings)
+- **Performance**: Intelligent caching system with 1-hour TTL for optimal mobile performance
+- **Offline Support**: Cached results provide offline functionality for recently accessed games
 
 ### XP System
 - **Action Types**: Log game, write review, complete quest, daily login
@@ -109,12 +127,24 @@ App
 - **signUp()**: User registration handling
 - **signOut()**: Session cleanup and state reset
 
-### LocalGameService
-- **searchGames()**: Search local database by title
-- **getPopularGames()**: Retrieve curated popular games list
-- **convertToIGDBFormat()**: Maintain compatibility with IGDB interface
-- **getAllGenres()**: Get available game genres for filtering
-- **Performance**: All operations are synchronous and instant
+### IGDBService
+- **searchGames()**: Search IGDB database with query and filters
+- **getPopularGames()**: Retrieve highly-rated games from IGDB
+- **getGameById()**: Get detailed game information including screenshots, videos, companies
+- **searchGamesAdvanced()**: Advanced filtering by genres, platforms, ratings
+- **getAllGenres()**: Get complete IGDB genres list
+- **getAllPlatforms()**: Get complete IGDB platforms list
+- **Caching**: Intelligent cache with TTL for performance optimization
+- **Error Handling**: Graceful fallbacks and comprehensive error management
+
+### UserRatingService
+- **rateGame()**: Add or update user ratings (1-10 scale) with reviews
+- **getUserRating()**: Get user's rating for specific game
+- **getGameRatingStats()**: Community rating statistics and distribution
+- **getCommunityReviews()**: Recent user reviews with profile information
+- **addToLibrary()**: Manage user's game library with status tracking
+- **getUserLibrary()**: Get user's complete game library with filtering
+- **getTopRatedGames()**: Community-driven top-rated games list
 
 ### AuthContext
 - **Global State**: User session management across app
@@ -123,8 +153,11 @@ App
 
 ## Performance Optimizations
 - **Lazy Loading**: Route-based code splitting
-- **Image Optimization**: WebP format, progressive loading
-- **List Virtualization**: FlatList for large datasets
-- **Memory Management**: Cleanup on unmount
-- **API Batching**: Combine related requests
-- **OAuth Caching**: Efficient session management and renewal
+- **Image Optimization**: IGDB CDN integration with optimized image sizes
+- **List Virtualization**: FlatList for large game datasets
+- **Memory Management**: Cleanup on unmount, cache size management
+- **API Caching**: Multi-layer caching system (memory cache + TTL management)
+- **Edge Function Optimization**: Supabase Edge Functions for serverless scaling
+- **Database Optimization**: Indexed queries, RLS policies, and database views for user ratings
+- **Offline Support**: Intelligent cache fallbacks for offline functionality
+- **Rate Limiting**: Built-in IGDB API rate limiting compliance (4 requests/second)

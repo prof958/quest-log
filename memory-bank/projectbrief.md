@@ -1,20 +1,24 @@
 # QuestLog - Project Brief
 
 ## Project Overview
-QuestLog is a game-like video game journal and tracker designed to feel like a retro handheld console or Pokédex. It's essentially "Letterboxd for games" with gamification elements.
+QuestLog is a game-like video game journal and tracker designed to feel like a retro handheld console or Pokédex. It's essentially "Letterboxd for games" with gamification elements and comprehensive game database integration.
 
 ## Core Features
 - **Game Logging**: Track games played with detailed entries
+- **User Ratings**: Community-driven rating system separate from professional ratings
 - **XP System**: Earn experience points for activities
 - **Quest System**: Complete challenges and objectives
 - **Leveling**: Progress through levels based on XP
 - **Badge Collection**: Unlock achievements and collectibles
 - **Progress Tracking**: Monitor gaming habits and statistics
+- **Game Discovery**: Search through 500k+ games from IGDB database
+- **Library Management**: Personal game collections with status tracking
 
 ## Technical Stack
 - **Frontend**: React Native (mobile-optimized)
-- **Backend**: Supabase (database, auth, real-time)
-- **Game Data**: RAWG API integration
+- **Backend**: Supabase (database, auth, real-time, Edge Functions)
+- **Game Data**: IGDB API integration via Supabase Edge Functions
+- **User Data**: Separate user rating and review system
 - **Platform**: Mobile-first, cross-platform
 
 ## Design Philosophy

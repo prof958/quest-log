@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, FlatList, TouchableOpacity, Image, ActivityIndicator, Alert } from 'react-native';
 import { RetroTheme } from '../theme/RetroTheme';
-import LocalGameService, { IGDBGame } from '../services/LocalGameService';
+import IGDBService, { IGDBGame } from '../services/IGDBService';
 
 interface GameSearchScreenProps {
   onGameSelect: (game: IGDBGame) => void;
@@ -14,11 +14,10 @@ interface GameItemProps {
 }
 
 const GameItem: React.FC<GameItemProps> = ({ game, onSelect }) => {
-  const localGameService = LocalGameService.getInstance();
-
   const getCoverUrl = () => {
-    if (game.cover?.image_id) {
-      return localGameService.formatImageUrl(game.cover.image_id, 'cover_small');
+    if (game.cover?.url) {
+      // IGDB service already provides formatted URLs
+      return game.cover.url;
     }
     return null;
   };
@@ -31,7 +30,11 @@ const GameItem: React.FC<GameItemProps> = ({ game, onSelect }) => {
   };
 
   const getReleaseYear = () => {
-    return localGameService.formatReleaseDate(game.first_release_date);
+    if (game.first_release_date) {
+      const date = new Date(game.first_release_date * 1000);
+      return date.getFullYear().toString();
+    }
+    return 'Unknown';
   };
 
   const getRating = () => {
@@ -101,7 +104,7 @@ const GameSearchScreen: React.FC<GameSearchScreenProps> = ({ onGameSelect, onBac
   const [isLoadingPopular, setIsLoadingPopular] = useState(true);
   const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
 
-  const localGameService = LocalGameService.getInstance();
+  const igdbService = IGDBService.getInstance();
 
   useEffect(() => {
     loadPopularGames();
@@ -109,16 +112,16 @@ const GameSearchScreen: React.FC<GameSearchScreenProps> = ({ onGameSelect, onBac
 
   const loadPopularGames = async () => {
     try {
-      console.log('🔥 Loading popular games...');
+      console.log('🔥 Loading popular games from IGDB...');
       setIsLoadingPopular(true);
-      const games = await localGameService.getPopularGames(10);
+      const games = await igdbService.getPopularGames(10);
       setPopularGames(games);
-      console.log(`✅ Loaded ${games.length} popular games`);
+      console.log(`✅ Loaded ${games.length} popular games from IGDB`);
     } catch (error) {
       console.error('❌ Failed to load popular games:', error);
       Alert.alert(
         'Error', 
-        'Unable to load popular games. Please try again.'
+        'Unable to load popular games from IGDB. Please check your internet connection and try again.'
       );
       setPopularGames([]);
     } finally {
@@ -133,24 +136,24 @@ const GameSearchScreen: React.FC<GameSearchScreenProps> = ({ onGameSelect, onBac
     }
 
     try {
-      console.log(`🔍 Searching for: "${query}"`);
+      console.log(`🔍 Searching IGDB for: "${query}"`);
       setIsLoading(true);
-      const games = await localGameService.searchGames(query, 20);
+      const games = await igdbService.searchGames(query, 20);
       setSearchResults(games);
-      console.log(`✅ Search completed: ${games.length} results`);
+      console.log(`✅ IGDB search completed: ${games.length} results`);
       
       // If no results, show a helpful message
       if (games.length === 0) {
         Alert.alert(
           'No Results', 
-          `No games found for "${query}". Try a different search term or check the spelling.`
+          `No games found for "${query}" in IGDB database. Try a different search term or check the spelling.`
         );
       }
     } catch (error) {
-      console.error('❌ Search failed:', error);
+      console.error('❌ IGDB search failed:', error);
       Alert.alert(
         'Search Error', 
-        'Failed to search games. Please try again.'
+        'Failed to search IGDB database. Please check your internet connection and try again.'
       );
       setSearchResults([]);
     } finally {
@@ -191,7 +194,8 @@ const GameSearchScreen: React.FC<GameSearchScreenProps> = ({ onGameSelect, onBac
             <Text style={styles.backButtonText}>← Back</Text>
           </TouchableOpacity>
         )}
-        <Text style={styles.title}>Add Game</Text>
+        <Text style={styles.title}>Search Games (IGDB)</Text>
+        <Text style={styles.subtitle}>500k+ games database</Text>
       </View>
 
       {/* Search Input */}
@@ -268,6 +272,12 @@ const styles = {
     fontSize: 24,
     fontWeight: 'bold' as const,
     color: RetroTheme.colors.text,
+  },
+  subtitle: {
+    fontSize: 12,
+    color: RetroTheme.colors.textSecondary,
+    textAlign: 'center' as const,
+    marginTop: 4,
   },
   searchContainer: {
     paddingHorizontal: 20,
