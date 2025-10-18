@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { RetroTheme } from '../theme/RetroTheme';
 import { useAuth } from '../context/AuthContext';
 import GameSearchScreen from './GameSearchScreen';
-import { IGDBGame } from '../services/LocalGameService';
+import { IGDBGame } from '../services/IGDBService';
 
 type MainAppView = 'home' | 'search' | 'library' | 'profile';
 
