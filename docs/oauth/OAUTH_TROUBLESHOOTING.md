@@ -48,6 +48,34 @@ In **Authentication** → **Providers** → **Google**:
 - Ensure Google OAuth is enabled
 - Verify redirect URLs are properly configured
 
+## 🚨 **NEW USER SIGNUP FAILS: "Database error saving new user"**
+
+**Problem**: Existing users can login fine, but new users get:
+```
+"error=server_error&error_code=unexpected_failure&error_description=Database+error+saving+new+user"
+```
+
+**Root Cause**: Missing INSERT policy on `users` table for new user creation.
+
+**✅ SOLUTION (TESTED & WORKING)**: Run the comprehensive fix in [`COMPLETE_FIX_NEW_USER_OAUTH.sql`](COMPLETE_FIX_NEW_USER_OAUTH.sql)
+
+**Key components of the fix**:
+1. **Proper INSERT Policy**: `WITH CHECK (true)` for trigger function execution
+2. **Error Handling**: Exception handling in trigger function prevents crashes
+3. **Better Metadata**: Improved parsing of Google OAuth user data
+4. **Clean Rebuild**: Drops and recreates all components for clean state
+
+**Why This Happens**:
+- RLS (Row Level Security) blocks the trigger function from creating new user profiles
+- The original INSERT policy `WITH CHECK (auth.uid() = id)` doesn't work for trigger functions
+- Trigger functions run as `SECURITY DEFINER` and need `WITH CHECK (true)`
+- Missing exception handling could crash the user creation process
+
+**✅ CONFIRMED WORKING**:
+- New users can now complete OAuth successfully 
+- No more "Database error saving new user" messages
+- Both existing and new users work perfectly
+
 ## 🧪 Testing Mobile OAuth (Should Work Now!)
 
 1. **Configure Supabase redirect URLs first** (see above - this is REQUIRED)

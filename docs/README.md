@@ -3,22 +3,30 @@
 ## Project Overview
 - [`README.md`](../README.md) - Main project overview and getting started guide
 
-## Setup & Configuration
-- [`SUPABASE_SETUP.md`](SUPABASE_SETUP.md) - Complete Supabase project setup instructions
-- [`SETUP_INSTRUCTIONS.md`](SETUP_INSTRUCTIONS.md) - Development environment setup
-- [`DATABASE_QUICK_SETUP.md`](DATABASE_QUICK_SETUP.md) - Database schema and migrations
+## 🚀 Setup & Configuration
+- [`setup/SUPABASE_SETUP.md`](setup/SUPABASE_SETUP.md) - Complete Supabase project setup instructions
+- [`setup/SETUP_INSTRUCTIONS.md`](setup/SETUP_INSTRUCTIONS.md) - Development environment setup
+- [`setup/DATABASE_QUICK_SETUP.md`](setup/DATABASE_QUICK_SETUP.md) - Database schema and migrations
 
-## Authentication
-- [`OAUTH_PRODUCTION_GUIDE.md`](OAUTH_PRODUCTION_GUIDE.md) - **📋 Complete OAuth production deployment guide**
-- [`OAUTH_SETUP.md`](OAUTH_SETUP.md) - OAuth provider configuration
-- [`OAUTH_CONFIGURATION.md`](OAUTH_CONFIGURATION.md) - Detailed OAuth implementation
-- [`OAUTH_QUICK_REFERENCE.md`](OAUTH_QUICK_REFERENCE.md) - Quick OAuth setup reference
-- [`OAUTH_TROUBLESHOOTING.md`](OAUTH_TROUBLESHOOTING.md) - Common OAuth issues and solutions
-- [`MOBILE_OAUTH_SETUP.md`](MOBILE_OAUTH_SETUP.md) - Mobile-specific OAuth configuration
+## 🔐 Authentication
+- [`oauth/OAUTH_PRODUCTION_GUIDE.md`](oauth/OAUTH_PRODUCTION_GUIDE.md) - **📋 Complete OAuth production deployment guide**
+- [`oauth/OAUTH_SETUP.md`](oauth/OAUTH_SETUP.md) - OAuth provider configuration
+- [`oauth/OAUTH_CONFIGURATION.md`](oauth/OAUTH_CONFIGURATION.md) - Detailed OAuth implementation
+- [`oauth/OAUTH_QUICK_REFERENCE.md`](oauth/OAUTH_QUICK_REFERENCE.md) - Quick OAuth setup reference
+- [`oauth/OAUTH_TROUBLESHOOTING.md`](oauth/OAUTH_TROUBLESHOOTING.md) - Common OAuth issues and solutions
+- [`oauth/MOBILE_OAUTH_SETUP.md`](oauth/MOBILE_OAUTH_SETUP.md) - Mobile-specific OAuth configuration
 
-## Database & API Integration
-- [`database_schema.sql`](database_schema.sql) - Complete database schema
-- [`SUPABASE_SECURITY_FIXES_VERIFICATION.sql`](SUPABASE_SECURITY_FIXES_VERIFICATION.sql) - Security verification queries
+## 🗄️ Database & SQL
+- [`sql/database_schema.sql`](sql/database_schema.sql) - Complete database schema
+- [`sql/COMPLETE_FIX_NEW_USER_OAUTH.sql`](sql/COMPLETE_FIX_NEW_USER_OAUTH.sql) - **✅ Working OAuth user creation fix**
+- [`sql/user_rating_database_setup.sql`](sql/user_rating_database_setup.sql) - User rating system tables
+- [`sql/igdb_cache_system_migration.sql`](sql/igdb_cache_system_migration.sql) - IGDB caching system
+- [`sql/SUPABASE_SECURITY_FIXES_VERIFICATION.sql`](sql/SUPABASE_SECURITY_FIXES_VERIFICATION.sql) - Security verification queries
+
+## 🏗️ Architecture & Implementation
+- [`database/IGDB_INTEGRATION_ARCHITECTURE.md`](database/IGDB_INTEGRATION_ARCHITECTURE.md) - IGDB API architecture
+- [`database/IGDB_RATE_LIMITING_STRATEGY.md`](database/IGDB_RATE_LIMITING_STRATEGY.md) - Rate limiting implementation
+- [`database/ENHANCED_CACHING_IMPLEMENTATION.md`](database/ENHANCED_CACHING_IMPLEMENTATION.md) - Caching system details
 
 ## Project Milestones & Architecture
 - [`IGDB_IMPLEMENTATION_SUCCESS.md`](IGDB_IMPLEMENTATION_SUCCESS.md) - IGDB API integration milestone
@@ -57,18 +65,19 @@ The [`memory-bank/`](../memory-bank/) directory contains development context and
 
 ---
 
-## Quick Start for New Developers
+## 🚀 Quick Start for New Developers
 
-1. **Setup Environment**: Follow [`SETUP_INSTRUCTIONS.md`](SETUP_INSTRUCTIONS.md)
-2. **Configure Supabase**: Use [`SUPABASE_SETUP.md`](SUPABASE_SETUP.md) 
-3. **Setup OAuth**: Follow [`OAUTH_SETUP.md`](OAUTH_SETUP.md)
-4. **Review Architecture**: Read [`memory-bank/systemPatterns.md`](../memory-bank/systemPatterns.md)
-5. **Check Progress**: See [`memory-bank/progress.md`](../memory-bank/progress.md) for current status
+1. **Setup Environment**: Follow [`setup/SETUP_INSTRUCTIONS.md`](setup/SETUP_INSTRUCTIONS.md)
+2. **Configure Supabase**: Use [`setup/SUPABASE_SETUP.md`](setup/SUPABASE_SETUP.md) 
+3. **Setup OAuth**: Follow [`oauth/OAUTH_SETUP.md`](oauth/OAUTH_SETUP.md)
+4. **Run SQL Setup**: Execute [`sql/database_schema.sql`](sql/database_schema.sql) in Supabase
+5. **Fix New User OAuth**: Run [`sql/COMPLETE_FIX_NEW_USER_OAUTH.sql`](sql/COMPLETE_FIX_NEW_USER_OAUTH.sql)
+6. **Review Architecture**: Read [`memory-bank/systemPatterns.md`](../memory-bank/systemPatterns.md)
 
-## Production Deployment
+## 🚀 Production Deployment
 
 For production deployment, especially OAuth configuration, refer to:
-- **[`OAUTH_PRODUCTION_GUIDE.md`](OAUTH_PRODUCTION_GUIDE.md)** - Comprehensive production setup guide
+- **[`oauth/OAUTH_PRODUCTION_GUIDE.md`](oauth/OAUTH_PRODUCTION_GUIDE.md)** - Comprehensive production setup guide
 - App store configuration requirements
 - Environment variable setup
 - URL configuration for production domains
