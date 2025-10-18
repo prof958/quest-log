@@ -62,13 +62,15 @@
 - [x] **✅ IMAGE LOADING OPTIMIZED**: Added loading states, error handling, and performance optimization
 - [x] **✅ REQUEST DEDUPLICATION**: Implemented pendingRequests Map to prevent duplicate API calls
 - [x] **✅ SUPABASE SECURITY FIXES**: Applied RLS policies and removed Security Definer from views
-- [x] **✅ MOBILE OAUTH IMPLEMENTATION**: Complete mobile OAuth fix using WebBrowser.openAuthSessionAsync
-- [x] **✅ OAUTH PACKAGE INTEGRATION**: Added expo-auth-session and expo-web-browser for proper OAuth handling
-- [x] **✅ MANUAL SESSION CREATION**: Implemented QueryParams parsing and supabase.auth.setSession() flow
-- [x] **✅ DEEP LINK CLEANUP**: Removed unnecessary deep link handling from AuthContext
-- [x] **✅ ERROR POPUP FIX**: Fixed false authentication failure popups in LoginScreen
-- [x] **✅ MOBILE OAUTH TESTED**: Confirmed working on mobile devices without grey page issue
-- [x] **✅ NEW USER OAUTH FIX**: Fixed database INSERT policy preventing new user creation via OAuth
+- **✅ MOBILE OAUTH IMPLEMENTATION**: Complete mobile OAuth fix using WebBrowser.openAuthSessionAsync
+- **✅ OAUTH PACKAGE INTEGRATION**: Added expo-auth-session and expo-web-browser for proper OAuth handling
+- **✅ MANUAL SESSION CREATION**: Implemented QueryParams parsing and supabase.auth.setSession() flow
+- **✅ DEEP LINK CLEANUP**: Removed unnecessary deep link handling from AuthContext
+- **✅ ERROR POPUP FIX**: Fixed false authentication failure popups in LoginScreen
+- **✅ MOBILE OAUTH TESTED**: Confirmed working on mobile devices without grey page issue
+- **✅ NEW USER OAUTH FIX**: Fixed database INSERT policy preventing new user creation via OAuth
+- **✅ TUNNEL OAUTH COMPLETE**: Mobile OAuth fully working with proper tunnel configuration
+- **✅ ENVIRONMENT SOLUTION**: Resolved tunnel issues using `npx expo start --tunnel` in QuestLogApp directory
 - [x] **✅ PROJECT ORGANIZATION**: Organized docs into subdirectories (oauth/, sql/, setup/, database/)
 - [x] **✅ CODE CLEANUP**: Removed obsolete LocalGameService, DemoAuthService, and archive directory
 - [x] **✅ DOCUMENTATION INDEX**: Created comprehensive docs/README.md with organized navigation
@@ -198,6 +200,11 @@
 - OAuth implementation simpler with Supabase's built-in providers
 - Comprehensive logging crucial for debugging authentication issues
 - Web platform testing valuable for rapid iteration during travel constraints
+- **🚨 CRITICAL: OAuth Tunnel Requirement**: Google OAuth REQUIRES `--tunnel` flag for mobile development
+  - **Working Command**: `Set-Location "C:\Users\prof9\repos\quest-log\quest-log\QuestLogApp"; npm start -- --tunnel`
+  - **Technical Reason**: Local IPs (`192.168.1.101:8081`) not accessible to Google's OAuth servers
+  - **Mobile Necessity**: Expo Go on mobile devices needs publicly accessible OAuth redirect URLs
+  - **Tunnel Creates**: Secure public URL through Expo servers for OAuth callback handling
 
 ### Evolution Notes
 - Started with clear vision: "Letterboxd for games" with cozy gaming feel

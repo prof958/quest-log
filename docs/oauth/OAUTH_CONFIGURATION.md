@@ -87,6 +87,8 @@ https://your-domain.com  # For production
 ```
 questlog://auth/callback
 http://localhost:8081/
+exp://1rp67xq-alpgulerbusiness-8081.exp.direct  # Tunnel URL for development
+exp://[user-slug]-[username]-8081.exp.direct    # Generic tunnel format
 ```
 
 ## Environment Configuration

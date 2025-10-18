@@ -5,6 +5,23 @@
 
 **AGENTS.md Status**: ✅ RESTORED and protected - Critical organizational file maintained per user requirements
 
+## 🚨 CRITICAL DEVELOPMENT REQUIREMENT: Tunnel Mode for OAuth
+**ALWAYS run Expo with `--tunnel` flag for Google OAuth to work properly**
+- **✅ WORKING COMMAND**: `cd .\QuestLogApp\` then `npx expo start --tunnel`
+- **🌐 CURRENT TUNNEL URL**: `exp://1rp67xq-alpgulerbusiness-8081.exp.direct`
+- **✅ CONFIGURATION COMPLETE**: Tunnel URL successfully added to Supabase and Google OAuth settings
+- **✅ MOBILE OAUTH WORKING**: Full mobile authentication flow now functional with tunnel mode
+- **Alternative**: `Set-Location "C:\Users\prof9\repos\quest-log\quest-log\QuestLogApp"; npm start -- --tunnel`
+- **Key**: Use `npx expo` (local CLI) not global `expo-cli` - avoids Node +17 compatibility issues
+- **Why Required**: Google OAuth needs publicly accessible redirect URI that local IP (`192.168.1.101:8081`) cannot provide
+- **Technical Analysis**:
+  - **Local Network Problem**: `exp://192.168.1.101:8081` only accessible within local network
+  - **OAuth Callback Issue**: Google's OAuth servers cannot reach local IPs to complete authentication flow
+  - **Mobile Device Access**: Expo Go on mobile needs publicly accessible URL for OAuth redirects
+  - **Tunnel Solution**: Creates secure tunnel through Expo servers (e.g., `https://abc123.tunnel.exp.direct`)
+- **Without Tunnel**: OAuth will fail silently or show authentication errors on mobile devices
+- **Remember**: This is MANDATORY for any OAuth testing - local development without tunnel breaks mobile OAuth flow completely
+
 ## Major Achievement - Enhanced Caching System Complete
 - **✅ Database Caching Schema**: Comprehensive cache tables (igdb_cache, igdb_cache_stats, igdb_rate_limit_log)
 - **✅ Enhanced Edge Function**: Rate-limited queue system (4 req/sec compliance) with intelligent caching

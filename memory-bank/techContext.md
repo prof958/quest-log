@@ -72,6 +72,12 @@
 - **Web Testing**: http://localhost:8081 for browser-based testing  
 - **Mobile Testing**: Expo Go app for device testing
 - **Environment Variables**: IGDB credentials and Supabase configuration
+- **🚨 CRITICAL: OAuth Development**: ALWAYS use tunnel mode for Google OAuth functionality
+  - **✅ WORKING COMMAND**: `cd .\QuestLogApp\` then `npx expo start --tunnel`
+  - **Why**: OAuth requires publicly accessible redirect URIs for mobile authentication
+  - **Local IP Issue**: `exp://192.168.1.101:8081` not accessible to Google's OAuth servers
+  - **Tunnel Solution**: Creates secure public URL like `https://abc123.tunnel.exp.direct`
+  - **CLI Note**: Use `npx expo` (local) not global `expo-cli` to avoid Node +17 compatibility issues
 
 ## Development Workflow
 - **Environment**: Local development with Expo Go
