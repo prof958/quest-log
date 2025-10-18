@@ -1,7 +1,9 @@
 # QuestLog - Active Context
 
-## Current Focus: Mobile OAuth Implementation Complete & Documentation Cleanup
-**Objective**: ✅ COMPLETED Mobile OAuth Fix + 🎯 ACTIVE Documentation & Cleanup
+## Current Focus: Project Organization Complete & Game Details Page Development
+**Objective**: ✅ COMPLETED Project Cleanup + 🎯 ACTIVE Game Details Page Development
+
+**AGENTS.md Status**: ✅ RESTORED and protected - Critical organizational file maintained per user requirements
 
 ## Major Achievement - Enhanced Caching System Complete
 - **✅ Database Caching Schema**: Comprehensive cache tables (igdb_cache, igdb_cache_stats, igdb_rate_limit_log)
@@ -14,6 +16,15 @@
 - **✅ Comprehensive Testing**: Complete test suite with 5.7x performance improvement verified
 - **✅ Production Deployment**: Successfully deployed and confirmed 18.8% hit rate with "Excellent" efficiency
 
+## New Achievement - Project Organization & Cleanup Complete
+- **✅ Documentation Organized**: Moved all docs to organized subdirectories (oauth/, sql/, setup/, database/)
+- **✅ Obsolete Code Removed**: Deleted LocalGameService, DemoAuthService, and unused test files
+- **✅ Archive Cleanup**: Removed old archive directory with outdated implementations
+- **✅ Import Fixes**: Updated MainAppScreen to use IGDBService instead of LocalGameService
+- **✅ Clean Structure**: Project now has professional, maintainable organization
+- **✅ New User OAuth Fix**: Deployed comprehensive database fix for new user creation
+- **✅ Documentation Index**: Created organized docs/README.md with clear navigation
+
 ## Major Achievement - Mobile OAuth Implementation Complete
 - **✅ OAuth Flow Fixed**: Replaced WebBrowser.openBrowserAsync with WebBrowser.openAuthSessionAsync for proper mobile OAuth
 - **✅ Session Management**: Implemented manual session creation using QueryParams and supabase.auth.setSession()  
@@ -22,6 +33,7 @@
 - **✅ Error Popup Fix**: Fixed false "auth failed" popups that appeared even on successful authentication
 - **✅ Mobile Testing**: Confirmed working on mobile devices - no more grey page stuck issue
 - **✅ Clean Implementation**: Follows official Supabase documentation for mobile OAuth patterns
+- **✅ New User Creation**: Fixed database INSERT policy issue preventing new user registration
 
 ## Previous Achievement - App Performance Optimizations Complete
 - **✅ Search UX Enhancement**: Changed search from debounced typing to Enter-key triggered for better UX
@@ -44,25 +56,30 @@
 - **✅ Frontend Integration**: GameSearchScreen successfully updated to use IGDB data with live search
 
 ## Next Immediate Steps
-1. **Documentation & Cleanup** (ACTIVE)
-   - Create comprehensive OAuth release documentation for production deployment
-   - Move all documentation files to /docs directory for organization  
-   - Remove unused files (old demo services, test utilities, etc.)
-   - Commit and push all documentation updates
-
-2. **Production OAuth Readiness**
-   - Document production URL configuration for app stores
-   - Environment variable setup documentation for deployment
-   - OAuth provider configuration for production domains
-   - Testing checklist for release day OAuth validation
-
-3. **GameDetailsScreen Development** 
+1. **GameDetailsScreen Development** (ACTIVE - NEXT)
    - Create comprehensive game details screen with IGDB rich metadata
+   - Display game screenshots, videos, and detailed information
    - Implement user rating and review functionality with caching optimization
-   - Add screenshots, videos, and game information display
-   - Integrate library management (add/remove, status tracking)
+   - Add library management (add/remove games, status tracking)
+   - Design retro handheld aesthetic for game details
+   - Integrate with existing IGDBService for game data
 
-4. **Production App Store Deployment**
+2. **Game Details Features**
+   - Game cover art and screenshot gallery
+   - Game description, genres, platforms, release date
+   - User ratings vs IGDB ratings comparison
+   - Personal rating and review input
+   - Library status (playing, completed, want to play, etc.)
+   - Add to personal library functionality
+
+3. **User Library System**
+   - Personal game library management
+   - Game status tracking (not played, playing, completed, dropped)
+   - Progress percentage and playtime tracking
+   - Personal rating and review system
+   - Library filtering and sorting
+
+4. **Production App Store Deployment** (LATER)
    - Mobile app optimization and final testing
    - App store deployment preparation and submission  
    - User onboarding flow and help documentation
@@ -85,9 +102,9 @@
 - **Comprehensive Documentation**: Memory bank system for project continuity
 
 ## Current Blockers/Questions  
-- None! Mobile OAuth is now fully functional and tested
-- Need to document production OAuth setup for app store releases
-- GameDetailsScreen needs to be built for comprehensive game information display
+- None! Project is well-organized and OAuth system is fully functional
+- GameDetailsScreen is the next major feature to implement
+- Need to design optimal UX for game details and library management
 - Mobile device testing and performance optimization pending
 
 ## Key Insights
