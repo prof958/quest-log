@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Image } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, Image } from 'react-native';
 import { RetroTheme } from '../theme/RetroTheme';
 import { useAuth } from '../context/AuthContext';
 import IGDBService, { IGDBGame } from '../services/IGDBService';
 import UserRatingService from '../services/UserRatingService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface LibraryScreenProps {
   onBack: () => void;
@@ -57,44 +58,74 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ onBack, onGameSelect }) =
     if (!user) return;
 
     try {
-      console.log('📚 Loading user library from database...');
+      console.log('📚 Loading user library...');
       setLoadingLibrary(true);
+      
+      // Try to load from cache first for instant display
+      const cachedLibrary = await AsyncStorage.getItem(`library_full_${user.id}`);
+      if (cachedLibrary) {
+        const cached = JSON.parse(cachedLibrary);
+        setUserGames(cached);
+        console.log(`✅ Loaded ${cached.length} games from cache instantly`);
+      }
       
       // Get library entries from database
       const libraryEntries = await UserRatingService.getInstance().getUserLibrary();
-      console.log(`✅ Found ${libraryEntries.length} games in library`);
+      console.log(`✅ Found ${libraryEntries.length} games in library from DB`);
 
-      // Fetch IGDB data for each game
-      const igdbService = IGDBService.getInstance();
-      const gamesWithData: LibraryGameData[] = [];
-
-      for (const entry of libraryEntries) {
-        try {
-          const gameData = await igdbService.getGameDetails(entry.igdb_game_id);
-          
-          // Extract rating if available
-          let rating = 0;
-          if (entry.rating) {
-            if (Array.isArray(entry.rating) && entry.rating.length > 0) {
-              rating = entry.rating[0].rating || 0;
-            } else if (typeof entry.rating === 'object' && 'rating' in entry.rating) {
-              rating = entry.rating.rating || 0;
-            }
-          }
-
-          gamesWithData.push({
-            igdbGameId: entry.igdb_game_id,
-            game: gameData,
-            status: entry.status,
-            rating: rating,
-            addedAt: entry.added_at
-          });
-        } catch (gameError) {
-          console.error(`Failed to load game ${entry.igdb_game_id}:`, gameError);
-        }
+      if (libraryEntries.length === 0) {
+        setUserGames([]);
+        await AsyncStorage.removeItem(`library_full_${user.id}`);
+        return;
       }
 
-      setUserGames(gamesWithData);
+      // Fetch IGDB data in batches of 50 for progressive loading
+      const igdbService = IGDBService.getInstance();
+      const gamesWithData: LibraryGameData[] = [];
+      const batchSize = 50;
+
+      for (let i = 0; i < libraryEntries.length; i += batchSize) {
+        const batch = libraryEntries.slice(i, i + batchSize);
+        
+        const batchPromises = batch.map(async (entry) => {
+          try {
+            const gameData = await igdbService.getGameDetails(entry.igdb_game_id);
+            
+            // Extract rating if available
+            let rating = 0;
+            if (entry.rating) {
+              if (Array.isArray(entry.rating) && entry.rating.length > 0) {
+                rating = entry.rating[0].rating || 0;
+              } else if (typeof entry.rating === 'object' && 'rating' in entry.rating) {
+                rating = entry.rating.rating || 0;
+              }
+            }
+
+            return {
+              igdbGameId: entry.igdb_game_id,
+              game: gameData,
+              status: entry.status,
+              rating: rating,
+              addedAt: entry.added_at
+            };
+          } catch (gameError) {
+            console.error(`Failed to load game ${entry.igdb_game_id}:`, gameError);
+            return null;
+          }
+        });
+
+        const batchResults = await Promise.all(batchPromises);
+        gamesWithData.push(...batchResults.filter(g => g !== null) as LibraryGameData[]);
+        
+        // Update UI progressively after each batch
+        setUserGames([...gamesWithData]);
+        console.log(`📦 Loaded batch ${i / batchSize + 1}: ${gamesWithData.length}/${libraryEntries.length} games`);
+      }
+
+      // Cache the complete library for next time
+      await AsyncStorage.setItem(`library_full_${user.id}`, JSON.stringify(gamesWithData));
+      console.log(`✅ Cached ${gamesWithData.length} games for instant future loads`);
+
     } catch (error) {
       console.error('Failed to load user library:', error);
     } finally {
@@ -105,6 +136,62 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ onBack, onGameSelect }) =
   const filteredGames = userGames.filter(game => 
     libraryFilter === 'all' || game.status === libraryFilter
   );
+
+  // Render function for FlatList
+  const renderGameCard = ({ item: gameData }: { item: LibraryGameData }) => (
+    <TouchableOpacity
+      style={styles.libraryGameCard}
+      onPress={() => onGameSelect(gameData.igdbGameId)}
+      activeOpacity={0.7}
+    >
+      {/* Game Cover Image */}
+      {gameData.game?.cover?.url ? (
+        <Image
+          source={{ uri: gameData.game.cover.url.replace('t_cover_big', 't_cover_small') }}
+          style={styles.libraryGameCover}
+          resizeMode="cover"
+        />
+      ) : (
+        <View style={styles.libraryGameCoverPlaceholder}>
+          <Text style={styles.libraryGameCoverPlaceholderText}>🎮</Text>
+        </View>
+      )}
+      
+      {/* Game Info */}
+      <View style={styles.libraryGameInfo}>
+        <Text style={styles.libraryGameName} numberOfLines={2}>
+          {gameData.game?.name || 'Loading...'}
+        </Text>
+        
+        {/* Status Badge */}
+        <View style={[
+          styles.libraryStatusBadge,
+          { backgroundColor: getStatusColor(gameData.status) }
+        ]}>
+          <Text style={styles.libraryStatusText}>
+            {getStatusLabel(gameData.status)}
+          </Text>
+        </View>
+        
+        {/* Rating */}
+        {gameData.rating ? (
+          <View style={styles.libraryRating}>
+            <Text style={styles.libraryRatingText}>
+              {'★'.repeat(Math.round(gameData.rating / 2))}
+              {'☆'.repeat(5 - Math.round(gameData.rating / 2))}
+            </Text>
+          </View>
+        ) : null}
+        
+        {/* Added Date */}
+        <Text style={styles.libraryGameDate}>
+          Added {new Date(gameData.addedAt).toLocaleDateString()}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const keyExtractor = (item: LibraryGameData) => `game-${item.igdbGameId}`;
 
   return (
     <View style={styles.container}>
@@ -177,71 +264,37 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ onBack, onGameSelect }) =
       </View>
       
       {/* Library Content */}
-      {loadingLibrary ? (
+      {loadingLibrary && filteredGames.length === 0 ? (
         <View style={styles.emptyLibrary}>
           <ActivityIndicator size="large" color={RetroTheme.colors.primary} />
           <Text style={styles.emptyLibrarySubtext}>Loading your library...</Text>
         </View>
       ) : filteredGames.length > 0 ? (
-        <ScrollView 
+        <FlatList
+          data={filteredGames}
+          renderItem={renderGameCard}
+          keyExtractor={keyExtractor}
           style={styles.libraryScroll}
-          showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.libraryScrollContent}
-        >
-          {filteredGames.map((gameData, index) => (
-            <TouchableOpacity
-              key={`${gameData.igdbGameId}-${index}`}
-              style={styles.libraryGameCard}
-              onPress={() => onGameSelect(gameData.igdbGameId)}
-              activeOpacity={0.7}
-            >
-              {/* Game Cover Image */}
-              {gameData.game?.cover?.url ? (
-                <Image
-                  source={{ uri: gameData.game.cover.url.replace('t_cover_big', 't_cover_small') }}
-                  style={styles.libraryGameCover}
-                  resizeMode="cover"
-                />
-              ) : (
-                <View style={styles.libraryGameCoverPlaceholder}>
-                  <Text style={styles.libraryGameCoverPlaceholderText}>🎮</Text>
-                </View>
-              )}
-              
-              {/* Game Info */}
-              <View style={styles.libraryGameInfo}>
-                <Text style={styles.libraryGameName} numberOfLines={2}>
-                  {gameData.game?.name || 'Loading...'}
-                </Text>
-                
-                {/* Status Badge */}
-                <View style={[
-                  styles.libraryStatusBadge,
-                  { backgroundColor: getStatusColor(gameData.status) }
-                ]}>
-                  <Text style={styles.libraryStatusText}>
-                    {getStatusLabel(gameData.status)}
-                  </Text>
-                </View>
-                
-                {/* Rating */}
-                {gameData.rating ? (
-                  <View style={styles.libraryRating}>
-                    <Text style={styles.libraryRatingText}>
-                      {'★'.repeat(Math.round(gameData.rating / 2))}
-                      {'☆'.repeat(5 - Math.round(gameData.rating / 2))}
-                    </Text>
-                  </View>
-                ) : null}
-                
-                {/* Added Date */}
-                <Text style={styles.libraryGameDate}>
-                  Added {new Date(gameData.addedAt).toLocaleDateString()}
+          showsVerticalScrollIndicator={false}
+          // Virtual scrolling optimizations
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          removeClippedSubviews={true}
+          updateCellsBatchingPeriod={50}
+          // Optional: Add loading indicator at bottom while refreshing
+          ListFooterComponent={
+            loadingLibrary ? (
+              <View style={{ padding: 20, alignItems: 'center' }}>
+                <ActivityIndicator size="small" color={RetroTheme.colors.primary} />
+                <Text style={{ color: RetroTheme.colors.textSecondary, marginTop: 8 }}>
+                  Refreshing...
                 </Text>
               </View>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+            ) : null
+          }
+        />
       ) : (
         <View style={styles.emptyLibrary}>
           <Text style={styles.emptyLibraryText}>

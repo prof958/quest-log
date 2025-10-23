@@ -16,6 +16,7 @@ import { RetroTheme } from '../theme/RetroTheme';
 import { IGDBGame, IGDBService } from '../services/IGDBService';
 import { UserRatingService, UserGameStatus } from '../services/UserRatingService';
 import { useAuth } from '../context/AuthContext';
+import ActivityLogService from '../services/ActivityLogService';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -221,13 +222,33 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
 
     try {
       setIsSaving(true);
+      const previousStatus = userStatus;
+      
       if (!isInLibrary) {
         // Add to library first
         await UserRatingService.getInstance().addGameToLibrary(gameId, newStatus);
         setIsInLibrary(true);
+        
+        // Log as "added" activity
+        await ActivityLogService.getInstance().logActivity(
+          user.id,
+          gameId,
+          game.name,
+          'added',
+          { status: newStatus }
+        );
       } else {
         // Update existing entry
         await UserRatingService.getInstance().updateGameStatus(gameId, newStatus);
+        
+        // Log as "status_changed" activity
+        await ActivityLogService.getInstance().logActivity(
+          user.id,
+          gameId,
+          game.name,
+          'status_changed',
+          { status: newStatus, previousStatus }
+        );
       }
       
       setUserStatus(newStatus);
@@ -284,6 +305,15 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
         userStatus
       );
       console.log('✅ Rating save result:', ratingResult);
+      
+      // Log rating activity
+      await ActivityLogService.getInstance().logActivity(
+        user.id,
+        gameId,
+        game.name,
+        'rated',
+        { rating: ratingOutOf10, review: userReview, status: userStatus }
+      );
       
       setShowRatingModal(false);
       

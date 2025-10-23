@@ -10,16 +10,18 @@ import GameDetailsScreen from './GameDetailsScreen';
 import LibraryScreen from './LibraryScreen';
 import IGDBService, { IGDBGame } from '../services/IGDBService';
 import UserRatingService, { UserGameLibraryEntry } from '../services/UserRatingService';
+import ActivityLogService, { ActivityLogEntry } from '../services/ActivityLogService';
 
 type MainAppView = 'home' | 'search' | 'library' | 'profile' | 'gameDetails';
 
-type ActivityType = 'added' | 'status_changed' | 'rated' | 'reviewed';
+type ActivityType = 'added' | 'status_changed' | 'rated';
 
 interface LibraryGameData {
   igdbGameId: number;
   game?: IGDBGame;
   status: string;
   rating?: number;
+  review?: string;
   addedAt: string;
   activityType?: ActivityType;
   previousStatus?: string;
@@ -33,7 +35,7 @@ const MainAppScreen: React.FC = () => {
   const [loadingLibrary, setLoadingLibrary] = useState(false);
   const [previousView, setPreviousView] = useState<MainAppView>('search');
   const [gameCount, setGameCount] = useState<number>(0);
-  const [recentGames, setRecentGames] = useState<LibraryGameData[]>([]);
+  const [recentActivities, setRecentActivities] = useState<ActivityLogEntry[]>([]);
 
   // Helper functions for status
   const getStatusColor = (status: string) => {
@@ -62,10 +64,21 @@ const MainAppScreen: React.FC = () => {
     // Use the activityType we determined from timestamps
     switch (gameData.activityType) {
       case 'rated':
+        const ratingText = gameData.rating ? `${gameData.rating / 2} stars` : 'No rating';
+        let detail = ratingText;
+        
+        // If there's a review, show shortened version (max 60 chars)
+        if (gameData.review && gameData.review.trim()) {
+          const shortened = gameData.review.length > 60 
+            ? gameData.review.substring(0, 57) + '...' 
+            : gameData.review;
+          detail = `${ratingText} • "${shortened}"`;
+        }
+        
         return {
           icon: '⭐',
           message: `Rated ${gameName}`,
-          detail: gameData.rating ? `${gameData.rating / 2} stars` : 'No rating'
+          detail: detail
         };
       
       case 'status_changed':
@@ -73,13 +86,6 @@ const MainAppScreen: React.FC = () => {
           icon: '🔄',
           message: `Changed status of ${gameName}`,
           detail: `Now: ${getStatusLabel(gameData.status)}`
-        };
-      
-      case 'reviewed':
-        return {
-          icon: '✍️',
-          message: `Reviewed ${gameName}`,
-          detail: `Rating: ${gameData.rating ? gameData.rating / 2 : 0} stars`
         };
       
       case 'added':
@@ -90,6 +96,41 @@ const MainAppScreen: React.FC = () => {
           detail: `Status: ${getStatusLabel(gameData.status)}`
         };
     }
+  };
+
+  const getActivityDisplay = (activity: ActivityLogEntry) => {
+    const icons = {
+      added: '➕',
+      rated: '⭐',
+      status_changed: '🔄'
+    };
+    
+    const messages = {
+      added: `Added ${activity.gameName}`,
+      rated: `Rated ${activity.gameName}`,
+      status_changed: `Changed status of ${activity.gameName}`
+    };
+    
+    let detail = '';
+    if (activity.action === 'rated' && activity.rating) {
+      detail = `${activity.rating / 2} stars`;
+      if (activity.review) {
+        const shortened = activity.review.length > 60 
+          ? activity.review.substring(0, 57) + '...' 
+          : activity.review;
+        detail += ` • "${shortened}"`;
+      }
+    } else if (activity.action === 'status_changed' && activity.status) {
+      detail = `Now: ${getStatusLabel(activity.status)}`;
+    } else if (activity.action === 'added' && activity.status) {
+      detail = `Status: ${getStatusLabel(activity.status)}`;
+    }
+    
+    return {
+      icon: icons[activity.action],
+      message: messages[activity.action],
+      detail
+    };
   };
 
   // Load library only when explicitly viewing library
@@ -120,99 +161,11 @@ const MainAppScreen: React.FC = () => {
   const loadRecentActivities = async () => {
     if (!user) return;
     try {
-      // Load from cache
-      const cachedRecent = await AsyncStorage.getItem(`recent_${user.id}`);
-      if (cachedRecent) {
-        setRecentGames(JSON.parse(cachedRecent));
-      }
+      const activities = await ActivityLogService.getInstance().getActivities(user.id);
+      setRecentActivities(activities);
+      console.log(`✅ Loaded ${activities.length} recent activities`);
     } catch (error) {
       console.error('Failed to load recent activities:', error);
-    }
-  };
-
-  const loadRecentActivitiesFromDB = async () => {
-    if (!user) return;
-    try {
-      console.log('🔄 Refreshing recent activities from database...');
-      // Get library entries
-      const libraryEntries = await UserRatingService.getInstance().getUserLibrary();
-      
-      if (libraryEntries.length === 0) {
-        setRecentGames([]);
-        return;
-      }
-
-      // Get the 3 most recent entries (already sorted by updated_at desc from DB)
-      const recentEntries = libraryEntries.slice(0, 3);
-      
-      // Fetch IGDB data for recent games only
-      const igdbService = IGDBService.getInstance();
-      const recentPromises = recentEntries.map(async (entry) => {
-        try {
-          const gameData = await igdbService.getGameDetails(entry.igdb_game_id);
-          
-          let rating = 0;
-          let ratingUpdatedAt: string | null = null;
-          if (entry.rating) {
-            if (Array.isArray(entry.rating) && entry.rating.length > 0) {
-              rating = entry.rating[0].rating;
-              ratingUpdatedAt = entry.rating[0].updated_at;
-            } else if (typeof entry.rating === 'object' && 'rating' in entry.rating) {
-              rating = entry.rating.rating;
-              ratingUpdatedAt = entry.rating.updated_at;
-            }
-          }
-
-          // Determine activity type based on what was most recently updated
-          const addedTime = new Date(entry.added_at).getTime();
-          const libraryUpdatedTime = new Date(entry.updated_at).getTime();
-          const timeSinceAdded = libraryUpdatedTime - addedTime;
-          
-          let activityType: ActivityType = 'added';
-          
-          // If entry was just added (within 5 seconds), it's a new addition
-          if (timeSinceAdded < 5000) {
-            activityType = 'added';
-          } else if (ratingUpdatedAt) {
-            // Has a rating - check if rating or status was updated more recently
-            const ratingUpdatedTime = new Date(ratingUpdatedAt).getTime();
-            const ratingAge = libraryUpdatedTime - ratingUpdatedTime;
-            
-            // If rating was updated within 5 seconds of library update, it was a rating action
-            // Use absolute difference since they can update in either order
-            if (Math.abs(ratingAge) < 5000) {
-              activityType = 'rated';
-            } else {
-              // Library was updated but rating wasn't recent = status change
-              activityType = 'status_changed';
-            }
-          } else {
-            // No rating but entry was updated after being added = status change
-            activityType = 'status_changed';
-          }
-
-          return {
-            igdbGameId: entry.igdb_game_id,
-            game: gameData || undefined,
-            status: entry.status,
-            rating: rating,
-            addedAt: entry.updated_at, // Use updated_at for sorting
-            activityType: activityType,
-          };
-        } catch (err) {
-          console.error(`Failed to load recent game ${entry.igdb_game_id}:`, err);
-          return null;
-        }
-      });
-
-      const recentGamesData = (await Promise.all(recentPromises)).filter(g => g !== null) as LibraryGameData[];
-      setRecentGames(recentGamesData);
-      
-      // Update cache
-      await AsyncStorage.setItem(`recent_${user.id}`, JSON.stringify(recentGamesData));
-      console.log(`✅ Refreshed ${recentGamesData.length} recent activities`);
-    } catch (error) {
-      console.error('Failed to refresh recent activities:', error);
     }
   };
 
@@ -254,13 +207,16 @@ const MainAppScreen: React.FC = () => {
             
             let rating = 0;
             let ratingUpdatedAt: string | null = null;
+            let review: string | undefined = undefined;
             if (entry.rating) {
               if (Array.isArray(entry.rating) && entry.rating.length > 0) {
                 rating = entry.rating[0].rating;
                 ratingUpdatedAt = entry.rating[0].updated_at;
+                review = entry.rating[0].review;
               } else if (typeof entry.rating === 'object' && 'rating' in entry.rating) {
                 rating = entry.rating.rating;
                 ratingUpdatedAt = entry.rating.updated_at;
+                review = entry.rating.review;
               }
             }
 
@@ -271,22 +227,24 @@ const MainAppScreen: React.FC = () => {
             
             let activityType: ActivityType = 'added';
             
-            // If entry was just added (within 5 seconds), it's a new addition
-            if (timeSinceAdded < 5000) {
-              activityType = 'added';
-            } else if (ratingUpdatedAt) {
-              // Has a rating - check if rating or status was updated more recently
+            // Check if there's a rating that was recently updated
+            if (ratingUpdatedAt) {
               const ratingUpdatedTime = new Date(ratingUpdatedAt).getTime();
               const ratingAge = libraryUpdatedTime - ratingUpdatedTime;
               
-              // If rating was updated within 5 seconds of library update, it was a rating action
-              // Use absolute difference since they can update in either order
-              if (Math.abs(ratingAge) < 5000) {
+              // If rating was updated within 60 seconds of library update, it was a rating action
+              if (Math.abs(ratingAge) < 60000) {
                 activityType = 'rated';
+              } else if (timeSinceAdded < 10000) {
+                // Entry was added recently but rating is old = new addition
+                activityType = 'added';
               } else {
                 // Library was updated but rating wasn't recent = status change
                 activityType = 'status_changed';
               }
+            } else if (timeSinceAdded < 10000) {
+              // No rating and was just added = new addition
+              activityType = 'added';
             } else {
               // No rating but entry was updated after being added = status change
               activityType = 'status_changed';
@@ -297,6 +255,7 @@ const MainAppScreen: React.FC = () => {
               game: gameData || undefined,
               status: entry.status,
               rating: rating,
+              review: review,
               addedAt: entry.updated_at,
               activityType: activityType,
             };
@@ -315,10 +274,6 @@ const MainAppScreen: React.FC = () => {
 
       // Cache the results
       await AsyncStorage.setItem(`library_${user.id}`, JSON.stringify(gamesWithData));
-      
-      // Cache recent 3 for home screen (already sorted by updated_at desc from DB)
-      const recent = gamesWithData.slice(0, 3);
-      await AsyncStorage.setItem(`recent_${user.id}`, JSON.stringify(recent));
       
       console.log(`✅ Loaded and cached ${gamesWithData.length} games`);
       
@@ -342,12 +297,12 @@ const MainAppScreen: React.FC = () => {
     setCurrentView(previousView);
     // Invalidate cache and reload appropriate data
     if (user) {
-      // Clear cache to force refresh on next library view
-      await AsyncStorage.removeItem(`library_${user.id}`);
-      await AsyncStorage.removeItem(`recent_${user.id}`);
+      // Clear both cache keys to force refresh on next library view
+      await AsyncStorage.removeItem(`library_${user.id}`); // MainAppScreen cache
+      await AsyncStorage.removeItem(`library_full_${user.id}`); // LibraryScreen cache
       
       // Always refresh recent activities since they appear on home screen
-      await loadRecentActivitiesFromDB();
+      await loadRecentActivities();
       
       // If going back to library, reload it
       if (previousView === 'library') {
@@ -484,21 +439,23 @@ const MainAppScreen: React.FC = () => {
             {/* Recent Activity */}
             <View style={styles.recentContainer}>
               <Text style={styles.sectionTitle}>Recent Activity</Text>
-              {recentGames.length > 0 ? (
-                recentGames.map((gameData, index) => {
-                  const activity = getActivityMessage(gameData);
+              {recentActivities.length > 0 ? (
+                recentActivities.map((activity) => {
+                  const display = getActivityDisplay(activity);
                   return (
-                    <View key={`${gameData.igdbGameId}-${index}`} style={styles.recentItem}>
-                      <Text style={styles.recentIcon}>{activity.icon}</Text>
+                    <View key={activity.id} style={styles.recentItem}>
+                      <Text style={styles.recentIcon}>{display.icon}</Text>
                       <View style={styles.recentContent}>
                         <Text style={styles.recentTitle}>
-                          {activity.message}
+                          {display.message}
                         </Text>
-                        <Text style={styles.recentDetail}>
-                          {activity.detail}
-                        </Text>
+                        {display.detail && (
+                          <Text style={styles.recentDetail}>
+                            {display.detail}
+                          </Text>
+                        )}
                         <Text style={styles.recentTime}>
-                          {new Date(gameData.addedAt).toLocaleDateString()}
+                          {new Date(activity.timestamp).toLocaleDateString()}
                         </Text>
                       </View>
                     </View>
