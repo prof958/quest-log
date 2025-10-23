@@ -287,7 +287,34 @@ export class IGDBService {
     try {
       const games = await this.makeIGDBRequest<IGDBGame[]>('games', searchQuery);
       
-      return games.map(game => ({
+      const queryLower = query.toLowerCase().trim();
+      
+      // Smart sorting: prioritize relevance first, then popularity
+      const sortedGames = games.sort((a, b) => {
+        const aName = a.name.toLowerCase();
+        const bName = b.name.toLowerCase();
+        
+        // Calculate match scores (higher is better)
+        const aExactMatch = aName === queryLower ? 1000 : 0;
+        const bExactMatch = bName === queryLower ? 1000 : 0;
+        
+        const aStartsWith = aName.startsWith(queryLower) ? 500 : 0;
+        const bStartsWith = bName.startsWith(queryLower) ? 500 : 0;
+        
+        const aContains = aName.includes(queryLower) ? 250 : 0;
+        const bContains = bName.includes(queryLower) ? 250 : 0;
+        
+        // Add popularity as a smaller factor (normalized to 0-100 range)
+        const aPopularity = Math.min((a.rating_count || 0) / 100, 100);
+        const bPopularity = Math.min((b.rating_count || 0) / 100, 100);
+        
+        const aScore = aExactMatch + aStartsWith + aContains + aPopularity;
+        const bScore = bExactMatch + bStartsWith + bContains + bPopularity;
+        
+        return bScore - aScore;
+      });
+      
+      return sortedGames.map(game => ({
         ...game,
         cover: game.cover ? {
           ...game.cover,
@@ -397,6 +424,38 @@ export class IGDBService {
     } catch (error) {
       console.error(`Error fetching game details for ID ${gameId}:`, error);
       throw new Error('Failed to fetch game details');
+    }
+  }
+
+  /**
+   * Get multiple games by IDs in a single request (batch operation)
+   */
+  public async getGamesByIds(gameIds: number[]): Promise<IGDBGame[]> {
+    if (gameIds.length === 0) {
+      return [];
+    }
+
+    const idsString = gameIds.join(',');
+    const batchQuery = `
+      fields name,summary,rating,rating_count,first_release_date,
+             cover.image_id,genres.name,platforms.name;
+      where id = (${idsString});
+      limit ${gameIds.length};
+    `;
+
+    try {
+      const games = await this.makeIGDBRequest<IGDBGame[]>('games', batchQuery);
+      
+      return games.map(game => ({
+        ...game,
+        cover: game.cover ? {
+          ...game.cover,
+          url: this.transformImageUrl(game.cover.image_id, 'cover_big')
+        } : undefined
+      }));
+    } catch (error) {
+      console.error(`Error fetching games by IDs:`, error);
+      throw new Error('Failed to fetch games');
     }
   }
 

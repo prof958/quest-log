@@ -97,6 +97,7 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
   const [selectedImage, setSelectedImage] = useState<string>('');
   const [expandedDescription, setExpandedDescription] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [loadingUserData, setLoadingUserData] = useState(false);
 
   useEffect(() => {
     loadGameDetails();
@@ -131,6 +132,7 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
     if (!user) return;
 
     try {
+      setLoadingUserData(true);
       console.log('👤 Loading user game data for game ID:', gameId);
       const userGame = await UserRatingService.getInstance().getUserGame(gameId);
       
@@ -165,6 +167,8 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
       }
     } catch (err) {
       console.error('❌ Failed to load user game data:', err);
+    } finally {
+      setLoadingUserData(false);
     }
   };
 
@@ -706,6 +710,15 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
           </View>
         </View>
       )}
+
+      {loadingUserData && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="large" color={RetroTheme.colors.primary} />
+            <Text style={styles.loadingOverlayText}>Loading your data...</Text>
+          </View>
+        </View>
+      )}
     </View>
   );
 };
@@ -720,6 +733,7 @@ const styles = {
     alignItems: 'center' as const,
     paddingHorizontal: 16,
     paddingVertical: 16,
+    paddingTop: 50,
     borderBottomWidth: 2,
     borderBottomColor: RetroTheme.colors.borderLight,
     backgroundColor: RetroTheme.colors.layer2,
@@ -789,7 +803,7 @@ const styles = {
   },
   gameTitle: {
     ...RetroTheme.text.h2,
-    marginTop: 12,
+    marginTop: 20,
     marginBottom: 8,
   },
   releaseDate: {
@@ -824,6 +838,7 @@ const styles = {
     ...RetroTheme.text.body,
     color: RetroTheme.colors.secondary,
     marginRight: 8,
+    lineHeight: 20,
   },
   ratingValue: {
     ...RetroTheme.text.h3,

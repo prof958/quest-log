@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Dimensions, Image } from 'react-native';
 import { RetroTheme } from '../theme/RetroTheme';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: screenWidth } = Dimensions.get('window');
 import { useAuth } from '../context/AuthContext';
@@ -12,12 +13,16 @@ import UserRatingService, { UserGameLibraryEntry } from '../services/UserRatingS
 
 type MainAppView = 'home' | 'search' | 'library' | 'profile' | 'gameDetails';
 
+type ActivityType = 'added' | 'status_changed' | 'rated' | 'reviewed';
+
 interface LibraryGameData {
   igdbGameId: number;
   game?: IGDBGame;
   status: string;
   rating?: number;
   addedAt: string;
+  activityType?: ActivityType;
+  previousStatus?: string;
 }
 
 const MainAppScreen: React.FC = () => {
@@ -27,6 +32,8 @@ const MainAppScreen: React.FC = () => {
   const [selectedGameId, setSelectedGameId] = useState<number | null>(null);
   const [loadingLibrary, setLoadingLibrary] = useState(false);
   const [previousView, setPreviousView] = useState<MainAppView>('search');
+  const [gameCount, setGameCount] = useState<number>(0);
+  const [recentGames, setRecentGames] = useState<LibraryGameData[]>([]);
 
   // Helper functions for status
   const getStatusColor = (status: string) => {
@@ -49,12 +56,165 @@ const MainAppScreen: React.FC = () => {
     }
   };
 
-  // Load library when switching to library or home view
+  const getActivityMessage = (gameData: LibraryGameData) => {
+    const gameName = gameData.game?.name || 'Unknown Game';
+    
+    // Use the activityType we determined from timestamps
+    switch (gameData.activityType) {
+      case 'rated':
+        return {
+          icon: '⭐',
+          message: `Rated ${gameName}`,
+          detail: gameData.rating ? `${gameData.rating / 2} stars` : 'No rating'
+        };
+      
+      case 'status_changed':
+        return {
+          icon: '🔄',
+          message: `Changed status of ${gameName}`,
+          detail: `Now: ${getStatusLabel(gameData.status)}`
+        };
+      
+      case 'reviewed':
+        return {
+          icon: '✍️',
+          message: `Reviewed ${gameName}`,
+          detail: `Rating: ${gameData.rating ? gameData.rating / 2 : 0} stars`
+        };
+      
+      case 'added':
+      default:
+        return {
+          icon: '➕',
+          message: `Added ${gameName}`,
+          detail: `Status: ${getStatusLabel(gameData.status)}`
+        };
+    }
+  };
+
+  // Load library only when explicitly viewing library
   useEffect(() => {
-    if (user && (currentView === 'library' || currentView === 'home')) {
+    if (user && currentView === 'library') {
       loadUserLibrary();
     }
   }, [user, currentView]);
+
+  // Load game count for home screen (lightweight)
+  useEffect(() => {
+    if (user && currentView === 'home') {
+      loadGameCount();
+      loadRecentActivities();
+    }
+  }, [user, currentView]);
+
+  const loadGameCount = async () => {
+    if (!user) return;
+    try {
+      const libraryEntries = await UserRatingService.getInstance().getUserLibrary();
+      setGameCount(libraryEntries.length);
+    } catch (error) {
+      console.error('Failed to load game count:', error);
+    }
+  };
+
+  const loadRecentActivities = async () => {
+    if (!user) return;
+    try {
+      // Load from cache
+      const cachedRecent = await AsyncStorage.getItem(`recent_${user.id}`);
+      if (cachedRecent) {
+        setRecentGames(JSON.parse(cachedRecent));
+      }
+    } catch (error) {
+      console.error('Failed to load recent activities:', error);
+    }
+  };
+
+  const loadRecentActivitiesFromDB = async () => {
+    if (!user) return;
+    try {
+      console.log('🔄 Refreshing recent activities from database...');
+      // Get library entries
+      const libraryEntries = await UserRatingService.getInstance().getUserLibrary();
+      
+      if (libraryEntries.length === 0) {
+        setRecentGames([]);
+        return;
+      }
+
+      // Get the 3 most recent entries (already sorted by updated_at desc from DB)
+      const recentEntries = libraryEntries.slice(0, 3);
+      
+      // Fetch IGDB data for recent games only
+      const igdbService = IGDBService.getInstance();
+      const recentPromises = recentEntries.map(async (entry) => {
+        try {
+          const gameData = await igdbService.getGameDetails(entry.igdb_game_id);
+          
+          let rating = 0;
+          let ratingUpdatedAt: string | null = null;
+          if (entry.rating) {
+            if (Array.isArray(entry.rating) && entry.rating.length > 0) {
+              rating = entry.rating[0].rating;
+              ratingUpdatedAt = entry.rating[0].updated_at;
+            } else if (typeof entry.rating === 'object' && 'rating' in entry.rating) {
+              rating = entry.rating.rating;
+              ratingUpdatedAt = entry.rating.updated_at;
+            }
+          }
+
+          // Determine activity type based on what was most recently updated
+          const addedTime = new Date(entry.added_at).getTime();
+          const libraryUpdatedTime = new Date(entry.updated_at).getTime();
+          const timeSinceAdded = libraryUpdatedTime - addedTime;
+          
+          let activityType: ActivityType = 'added';
+          
+          // If entry was just added (within 5 seconds), it's a new addition
+          if (timeSinceAdded < 5000) {
+            activityType = 'added';
+          } else if (ratingUpdatedAt) {
+            // Has a rating - check if rating or status was updated more recently
+            const ratingUpdatedTime = new Date(ratingUpdatedAt).getTime();
+            const ratingAge = libraryUpdatedTime - ratingUpdatedTime;
+            
+            // If rating was updated within 5 seconds of library update, it was a rating action
+            // Use absolute difference since they can update in either order
+            if (Math.abs(ratingAge) < 5000) {
+              activityType = 'rated';
+            } else {
+              // Library was updated but rating wasn't recent = status change
+              activityType = 'status_changed';
+            }
+          } else {
+            // No rating but entry was updated after being added = status change
+            activityType = 'status_changed';
+          }
+
+          return {
+            igdbGameId: entry.igdb_game_id,
+            game: gameData || undefined,
+            status: entry.status,
+            rating: rating,
+            addedAt: entry.updated_at, // Use updated_at for sorting
+            activityType: activityType,
+          };
+        } catch (err) {
+          console.error(`Failed to load recent game ${entry.igdb_game_id}:`, err);
+          return null;
+        }
+      });
+
+      const recentGamesData = (await Promise.all(recentPromises)).filter(g => g !== null) as LibraryGameData[];
+      setRecentGames(recentGamesData);
+      
+      // Update cache
+      await AsyncStorage.setItem(`recent_${user.id}`, JSON.stringify(recentGamesData));
+      console.log(`✅ Refreshed ${recentGamesData.length} recent activities`);
+    } catch (error) {
+      console.error('Failed to refresh recent activities:', error);
+    }
+  };
 
   const loadUserLibrary = async () => {
     if (!user) return;
@@ -63,42 +223,105 @@ const MainAppScreen: React.FC = () => {
       console.log('📚 Loading user library from database...');
       setLoadingLibrary(true);
       
+      // Try to load from cache first for instant display
+      const cachedData = await AsyncStorage.getItem(`library_${user.id}`);
+      if (cachedData) {
+        const cached = JSON.parse(cachedData);
+        setUserGames(cached);
+        console.log('✅ Loaded from cache:', cached.length, 'games');
+      }
+      
       // Get library entries from database
       const libraryEntries = await UserRatingService.getInstance().getUserLibrary();
       console.log(`✅ Found ${libraryEntries.length} games in library`);
 
-      // Fetch IGDB data for each game
-      const igdbService = IGDBService.getInstance();
-      const gamesWithData: LibraryGameData[] = [];
-
-      for (const entry of libraryEntries) {
-        try {
-          const gameData = await igdbService.getGameDetails(entry.igdb_game_id);
-          
-          // Extract rating if available
-          let rating = 0;
-          if (entry.rating) {
-            if (Array.isArray(entry.rating) && entry.rating.length > 0) {
-              rating = entry.rating[0].rating;
-            } else if (typeof entry.rating === 'object' && 'rating' in entry.rating) {
-              rating = entry.rating.rating;
-            }
-          }
-
-          gamesWithData.push({
-            igdbGameId: entry.igdb_game_id,
-            game: gameData || undefined,
-            status: entry.status,
-            rating: rating,
-            addedAt: entry.added_at,
-          });
-        } catch (err) {
-          console.error(`Failed to load game ${entry.igdb_game_id}:`, err);
-        }
+      if (libraryEntries.length === 0) {
+        setUserGames([]);
+        await AsyncStorage.removeItem(`library_${user.id}`);
+        return;
       }
 
-      setUserGames(gamesWithData);
-      console.log(`✅ Loaded ${gamesWithData.length} games with IGDB data`);
+      // Fetch IGDB data with parallel requests (limit to 5 concurrent)
+      const igdbService = IGDBService.getInstance();
+      const gamesWithData: LibraryGameData[] = [];
+      const batchSize = 5;
+
+      for (let i = 0; i < libraryEntries.length; i += batchSize) {
+        const batch = libraryEntries.slice(i, i + batchSize);
+        const batchPromises = batch.map(async (entry) => {
+          try {
+            const gameData = await igdbService.getGameDetails(entry.igdb_game_id);
+            
+            let rating = 0;
+            let ratingUpdatedAt: string | null = null;
+            if (entry.rating) {
+              if (Array.isArray(entry.rating) && entry.rating.length > 0) {
+                rating = entry.rating[0].rating;
+                ratingUpdatedAt = entry.rating[0].updated_at;
+              } else if (typeof entry.rating === 'object' && 'rating' in entry.rating) {
+                rating = entry.rating.rating;
+                ratingUpdatedAt = entry.rating.updated_at;
+              }
+            }
+
+            // Determine activity type based on what was most recently updated
+            const addedTime = new Date(entry.added_at).getTime();
+            const libraryUpdatedTime = new Date(entry.updated_at).getTime();
+            const timeSinceAdded = libraryUpdatedTime - addedTime;
+            
+            let activityType: ActivityType = 'added';
+            
+            // If entry was just added (within 5 seconds), it's a new addition
+            if (timeSinceAdded < 5000) {
+              activityType = 'added';
+            } else if (ratingUpdatedAt) {
+              // Has a rating - check if rating or status was updated more recently
+              const ratingUpdatedTime = new Date(ratingUpdatedAt).getTime();
+              const ratingAge = libraryUpdatedTime - ratingUpdatedTime;
+              
+              // If rating was updated within 5 seconds of library update, it was a rating action
+              // Use absolute difference since they can update in either order
+              if (Math.abs(ratingAge) < 5000) {
+                activityType = 'rated';
+              } else {
+                // Library was updated but rating wasn't recent = status change
+                activityType = 'status_changed';
+              }
+            } else {
+              // No rating but entry was updated after being added = status change
+              activityType = 'status_changed';
+            }
+
+            return {
+              igdbGameId: entry.igdb_game_id,
+              game: gameData || undefined,
+              status: entry.status,
+              rating: rating,
+              addedAt: entry.updated_at,
+              activityType: activityType,
+            };
+          } catch (err) {
+            console.error(`Failed to load game ${entry.igdb_game_id}:`, err);
+            return null;
+          }
+        });
+
+        const batchResults = await Promise.all(batchPromises);
+        gamesWithData.push(...batchResults.filter(g => g !== null) as LibraryGameData[]);
+        
+        // Update UI progressively
+        setUserGames([...gamesWithData]);
+      }
+
+      // Cache the results
+      await AsyncStorage.setItem(`library_${user.id}`, JSON.stringify(gamesWithData));
+      
+      // Cache recent 3 for home screen (already sorted by updated_at desc from DB)
+      const recent = gamesWithData.slice(0, 3);
+      await AsyncStorage.setItem(`recent_${user.id}`, JSON.stringify(recent));
+      
+      console.log(`✅ Loaded and cached ${gamesWithData.length} games`);
+      
     } catch (error) {
       console.error('❌ Failed to load user library:', error);
     } finally {
@@ -113,13 +336,26 @@ const MainAppScreen: React.FC = () => {
     setCurrentView('gameDetails');
   };
 
-  const handleBackFromGameDetails = () => {
+  const handleBackFromGameDetails = async () => {
     console.log('⬅️ Returning from game details to:', previousView);
     setSelectedGameId(null);
     setCurrentView(previousView);
-    // Reload library when coming back from game details
+    // Invalidate cache and reload appropriate data
     if (user) {
-      loadUserLibrary();
+      // Clear cache to force refresh on next library view
+      await AsyncStorage.removeItem(`library_${user.id}`);
+      await AsyncStorage.removeItem(`recent_${user.id}`);
+      
+      // Always refresh recent activities since they appear on home screen
+      await loadRecentActivitiesFromDB();
+      
+      // If going back to library, reload it
+      if (previousView === 'library') {
+        await loadUserLibrary();
+      } else {
+        // For home or search views, reload game count
+        await loadGameCount();
+      }
     }
   };
 
@@ -191,7 +427,7 @@ const MainAppScreen: React.FC = () => {
               <Text style={styles.sectionTitle}>Your Progress</Text>
               <View style={styles.statsRow}>
                 <View style={styles.statItem}>
-                  <Text style={styles.statNumber}>{userGames.length}</Text>
+                  <Text style={styles.statNumber}>{gameCount}</Text>
                   <Text style={styles.statLabel}>Games</Text>
                 </View>
                 <View style={styles.statItem}>
@@ -248,28 +484,34 @@ const MainAppScreen: React.FC = () => {
             {/* Recent Activity */}
             <View style={styles.recentContainer}>
               <Text style={styles.sectionTitle}>Recent Activity</Text>
-              {loadingLibrary ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="small" color={RetroTheme.colors.primary} />
-                </View>
-              ) : userGames.length > 0 ? (
-                userGames.slice(-3).reverse().map((gameData, index) => (
-                  <View key={`${gameData.igdbGameId}-${index}`} style={styles.recentItem}>
-                    <Text style={styles.recentIcon}>🎮</Text>
-                    <View style={styles.recentContent}>
-                      <Text style={styles.recentTitle}>
-                        Added {gameData.game?.name || 'Unknown Game'}
-                      </Text>
-                      <Text style={styles.recentTime}>
-                        {new Date(gameData.addedAt).toLocaleDateString()}
-                      </Text>
+              {recentGames.length > 0 ? (
+                recentGames.map((gameData, index) => {
+                  const activity = getActivityMessage(gameData);
+                  return (
+                    <View key={`${gameData.igdbGameId}-${index}`} style={styles.recentItem}>
+                      <Text style={styles.recentIcon}>{activity.icon}</Text>
+                      <View style={styles.recentContent}>
+                        <Text style={styles.recentTitle}>
+                          {activity.message}
+                        </Text>
+                        <Text style={styles.recentDetail}>
+                          {activity.detail}
+                        </Text>
+                        <Text style={styles.recentTime}>
+                          {new Date(gameData.addedAt).toLocaleDateString()}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
-                ))
+                  );
+                })
               ) : (
-                <View style={styles.emptyRecent}>
-                  <Text style={styles.emptyRecentText}>No recent activity</Text>
-                  <Text style={styles.emptyRecentSubtext}>Start by adding your first game!</Text>
+                <View style={styles.welcomeBox}>
+                  <Text style={styles.welcomeText}>
+                    You have {gameCount} game{gameCount !== 1 ? 's' : ''} in your library.
+                  </Text>
+                  <Text style={styles.welcomeSubtext}>
+                    Start tracking your gaming journey!
+                  </Text>
                 </View>
               )}
             </View>
@@ -435,12 +677,13 @@ const styles = {
   recentItem: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
-    backgroundColor: RetroTheme.colors.surface,
-    borderRadius: 8,
+    backgroundColor: RetroTheme.colors.layer3,
+    borderRadius: RetroTheme.borderRadius.md,
     padding: 12,
     marginBottom: 8,
     borderWidth: 2,
-    borderColor: RetroTheme.colors.border,
+    borderColor: RetroTheme.colors.borderLight,
+    ...RetroTheme.shadows.small,
   },
   recentIcon: {
     fontSize: 20,
@@ -450,33 +693,47 @@ const styles = {
     flex: 1,
   },
   recentTitle: {
+    ...RetroTheme.text.body,
     fontSize: 14,
-    color: RetroTheme.colors.text,
     fontWeight: 'bold' as const,
   },
-  recentTime: {
+  recentDetail: {
+    ...RetroTheme.text.caption,
     fontSize: 12,
-    color: RetroTheme.colors.textSecondary,
+    color: RetroTheme.colors.primary,
     marginTop: 2,
+    fontWeight: '600' as const,
+  },
+  recentTime: {
+    ...RetroTheme.text.caption,
+    fontSize: 11,
+    color: RetroTheme.colors.textSecondary,
+    marginTop: 4,
+  },
+  welcomeBox: {
+    backgroundColor: RetroTheme.colors.layer3,
+    borderRadius: RetroTheme.borderRadius.md,
+    padding: 20,
+    borderWidth: 2,
+    borderColor: RetroTheme.colors.borderLight,
+    alignItems: 'center' as const,
+    ...RetroTheme.shadows.small,
+  },
+  welcomeText: {
+    ...RetroTheme.text.body,
+    fontSize: 16,
+    textAlign: 'center' as const,
+    marginBottom: 8,
+  },
+  welcomeSubtext: {
+    ...RetroTheme.text.caption,
+    fontSize: 14,
+    color: RetroTheme.colors.textSecondary,
+    textAlign: 'center' as const,
   },
   loadingContainer: {
     alignItems: 'center' as const,
     padding: 20,
-  },
-  emptyRecent: {
-    alignItems: 'center' as const,
-    padding: 20,
-  },
-  emptyRecentText: {
-    fontSize: 16,
-    color: RetroTheme.colors.textSecondary,
-    textAlign: 'center' as const,
-  },
-  emptyRecentSubtext: {
-    fontSize: 12,
-    color: RetroTheme.colors.textSecondary,
-    textAlign: 'center' as const,
-    marginTop: 4,
   },
   libraryContainer: {
     flex: 1,
