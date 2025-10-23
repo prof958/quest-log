@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Dimensions, Image } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Dimensions, Image, BackHandler } from 'react-native';
 import { RetroTheme } from '../theme/RetroTheme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -147,6 +147,24 @@ const MainAppScreen: React.FC = () => {
       loadRecentActivities();
     }
   }, [user, currentView]);
+
+  // Handle Android back button
+  useEffect(() => {
+    const backAction = () => {
+      if (currentView === 'gameDetails') {
+        handleBackFromGameDetails();
+        return true; // Prevent default behavior
+      } else if (currentView !== 'home') {
+        setCurrentView('home');
+        return true; // Prevent default behavior
+      }
+      return false; // Allow default behavior (exit app) when on home
+    };
+
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+
+    return () => backHandler.remove();
+  }, [currentView, previousView]);
 
   const loadGameCount = async () => {
     if (!user) return;

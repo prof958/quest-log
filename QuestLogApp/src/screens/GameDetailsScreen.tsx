@@ -110,6 +110,13 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
   const [expandedDescription, setExpandedDescription] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [loadingUserData, setLoadingUserData] = useState(false);
+  
+  // QuestLog community rating
+  const [questLogRating, setQuestLogRating] = useState<number | null>(null);
+  const [questLogRatingCount, setQuestLogRatingCount] = useState<number>(0);
+  const [showCommunityReviews, setShowCommunityReviews] = useState(false);
+  const [communityReviews, setCommunityReviews] = useState<any[]>([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
 
   useEffect(() => {
     loadGameDetails();
@@ -119,7 +126,8 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
     if (user && game) {
       loadUserGameData();
     }
-  }, [user, game]);
+    loadQuestLogRating();
+  }, [user, game, gameId]);
 
   const loadGameDetails = async () => {
     try {
@@ -204,6 +212,44 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
       console.error('❌ Failed to load user game data:', err);
     } finally {
       setLoadingUserData(false);
+    }
+  };
+
+  const loadCommunityReviews = async () => {
+    try {
+      setLoadingReviews(true);
+      console.log('📚 Loading community reviews for game ID:', gameId);
+      
+      const reviews = await UserRatingService.getInstance().getCommunityReviews(gameId, 50);
+      
+      console.log('✅ Found', reviews.length, 'community reviews');
+      setCommunityReviews(reviews);
+    } catch (err) {
+      console.error('❌ Failed to load community reviews:', err);
+      setCommunityReviews([]);
+    } finally {
+      setLoadingReviews(false);
+    }
+  };
+
+  const loadQuestLogRating = async () => {
+    try {
+      console.log('📊 Loading QuestLog rating for game ID:', gameId);
+      const stats = await UserRatingService.getInstance().getGameRatingStats(gameId);
+      
+      if (stats && stats.user_rating_count > 0) {
+        console.log('✅ QuestLog rating found:', stats.user_rating_average, 'from', stats.user_rating_count, 'users');
+        setQuestLogRating(stats.user_rating_average);
+        setQuestLogRatingCount(stats.user_rating_count);
+      } else {
+        console.log('ℹ️ No QuestLog ratings yet');
+        setQuestLogRating(null);
+        setQuestLogRatingCount(0);
+      }
+    } catch (err) {
+      console.error('❌ Failed to load QuestLog rating:', err);
+      setQuestLogRating(null);
+      setQuestLogRatingCount(0);
     }
   };
 
@@ -297,7 +343,7 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
 
   // Calculate overall rating from category ratings
   const calculateOverallRating = (categories: CategoryRatings): number => {
-    const ratings = Object.values(categories).filter(r => r > 0);
+    const ratings = Object.values(categories).filter(r => r >= 1);
     if (ratings.length === 0) return 0;
     return ratings.reduce((sum, r) => sum + r, 0) / ratings.length;
   };
@@ -310,11 +356,19 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
       return;
     }
 
-    // Validate at least one category is rated
-    const hasRatings = Object.values(categoryRatings).some(r => r > 0);
+    // Validate at least one category is rated (must be >= 1)
+    const hasRatings = Object.values(categoryRatings).some(r => r >= 1);
     if (!hasRatings) {
       console.log('❌ Cannot save - no category ratings selected');
       Alert.alert('Rating Required', 'Please rate at least one category before saving.');
+      return;
+    }
+
+    // Validate all non-zero ratings are at least 1.0
+    const invalidRatings = Object.entries(categoryRatings).filter(([_, r]) => r > 0 && r < 1);
+    if (invalidRatings.length > 0) {
+      console.log('❌ Cannot save - ratings below 1.0 detected:', invalidRatings);
+      Alert.alert('Invalid Rating', 'Ratings must be between 1 and 5 stars.');
       return;
     }
 
@@ -369,8 +423,9 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
       
       setShowRatingModal(false);
       
-      // Reload user game data to ensure UI reflects latest state
+      // Reload user game data and community rating to ensure UI reflects latest state
       await loadUserGameData();
+      await loadQuestLogRating();
       
       Alert.alert('Success', 'Your rating has been saved!');
     } catch (err) {
@@ -552,8 +607,31 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
               <View style={styles.ratingDisplaySection}>
                 <View style={styles.ratingHeader}>
                   <Text style={styles.ratingLabel}>Your Rating:</Text>
-                  {renderStars(userRating)}
+                  <StarRating
+                    rating={userRating}
+                    size={20}
+                    showNumber
+                    color={RetroTheme.colors.primary}
+                  />
                 </View>
+                
+                {/* Compact Category Ratings Display */}
+                {((categoryRatings.story || 0) >= 1 || (categoryRatings.gameplay || 0) >= 1 || 
+                  (categoryRatings.audio || 0) >= 1 || (categoryRatings.visual || 0) >= 1 || 
+                  (categoryRatings.joy || 0) >= 1) && (
+                  <View style={styles.categoryRatingsCompact}>
+                    {RATING_CATEGORIES.map((category) => {
+                      const rating = categoryRatings[category.id as keyof CategoryRatings] || 0;
+                      if (rating < 1) return null;
+                      return (
+                        <View key={category.id} style={styles.compactCategoryItem}>
+                          <Text style={styles.compactCategoryIcon}>{category.icon}</Text>
+                          <Text style={styles.compactCategoryRating}>{rating.toFixed(1)}</Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
               </View>
             )}
 
@@ -563,6 +641,16 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
                 <Text style={styles.reviewLabel}>Your Review:</Text>
                 <Text style={styles.reviewText}>{userReview}</Text>
               </View>
+            )}
+
+            {/* Remove from Library Button (only show if in library) */}
+            {isInLibrary && (
+              <TouchableOpacity
+                style={styles.removeFromLibraryButton}
+                onPress={handleRemoveFromLibrary}
+              >
+                <Text style={styles.removeFromLibraryText}>🗑️ Remove from Library</Text>
+              </TouchableOpacity>
             )}
           </View>
         )}
@@ -583,13 +671,31 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
               </View>
             )}
 
-            {/* QuestLog Rating - Placeholder */}
-            <View style={styles.ratingCard}>
+            {/* QuestLog Rating - Clickable */}
+            <TouchableOpacity 
+              style={styles.ratingCard}
+              onPress={async () => {
+                if (questLogRatingCount > 0) {
+                  await loadCommunityReviews();
+                  setShowCommunityReviews(true);
+                }
+              }}
+              disabled={questLogRatingCount === 0}
+            >
               <Text style={styles.ratingSourceLabel}>QuestLog</Text>
-              <Text style={styles.ratingSourceValue}>-</Text>
-              <Text style={styles.ratingSourceMax}>/10</Text>
-              <Text style={styles.ratingSourceVotes}>No ratings yet</Text>
-            </View>
+              <Text style={styles.ratingSourceValue}>
+                {questLogRating !== null ? (questLogRating / 2).toFixed(1) : '-'}
+              </Text>
+              <Text style={styles.ratingSourceMax}>/5</Text>
+              <Text style={styles.ratingSourceVotes}>
+                {questLogRatingCount > 0 
+                  ? `${questLogRatingCount} rating${questLogRatingCount !== 1 ? 's' : ''}`
+                  : 'No ratings yet'}
+              </Text>
+              {questLogRatingCount > 0 && (
+                <Text style={styles.tapToViewReviews}>Tap to view reviews</Text>
+              )}
+            </TouchableOpacity>
 
             {/* MetaCritic Rating - Placeholder */}
             <View style={styles.ratingCard}>
@@ -750,7 +856,7 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
                           [category.id]: rating,
                         }));
                       }}
-                      size={28}
+                      size={24}
                     />
                   </View>
                 ))}
@@ -761,7 +867,7 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
                 <Text style={styles.overallLabel}>Overall Rating</Text>
                 <StarRating
                   rating={calculateOverallRating(categoryRatings)}
-                  size={32}
+                  size={28}
                   showNumber
                   color={RetroTheme.colors.primary}
                 />
@@ -774,10 +880,10 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
                   style={styles.reviewInput}
                   value={userReview}
                   onChangeText={setUserReview}
-                  placeholder="Share your thoughts about this game..."
+                  placeholder="Share your thoughts..."
                   placeholderTextColor={RetroTheme.colors.secondary}
                   multiline
-                  numberOfLines={4}
+                  numberOfLines={3}
                 />
               </View>
 
@@ -810,6 +916,107 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
         category={selectedCategory}
         onClose={() => setShowCategoryInfo(false)}
       />
+
+      {/* Community Reviews Modal */}
+      <Modal
+        visible={showCommunityReviews}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowCommunityReviews(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.communityReviewsModal}>
+            <View style={styles.communityReviewsHeader}>
+              <Text style={styles.communityReviewsTitle}>Community Reviews</Text>
+              <TouchableOpacity onPress={() => setShowCommunityReviews(false)}>
+                <Text style={styles.communityReviewsClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {loadingReviews ? (
+              <View style={styles.communityReviewsLoading}>
+                <ActivityIndicator size="large" color={RetroTheme.colors.primary} />
+                <Text style={styles.loadingText}>Loading reviews...</Text>
+              </View>
+            ) : communityReviews.length === 0 ? (
+              <View style={styles.communityReviewsEmpty}>
+                <Text style={styles.emptyReviewsText}>No reviews yet</Text>
+              </View>
+            ) : (
+              <ScrollView style={styles.communityReviewsList}>
+                {communityReviews.map((review: any) => (
+                  <View key={review.id} style={styles.communityReviewItem}>
+                    <View style={styles.reviewItemHeader}>
+                      <View style={styles.reviewUserInfo}>
+                        {review.user_profiles?.avatar_url ? (
+                          <Image 
+                            source={{ uri: review.user_profiles.avatar_url }} 
+                            style={styles.reviewUserAvatar}
+                          />
+                        ) : (
+                          <View style={styles.reviewUserAvatarPlaceholder}>
+                            <Text style={styles.reviewUserAvatarText}>
+                              {(review.user_profiles?.username || 'U')[0].toUpperCase()}
+                            </Text>
+                          </View>
+                        )}
+                        <View style={styles.reviewUserDetails}>
+                          <View style={styles.reviewUserNameRow}>
+                            <Text style={styles.reviewUsername}>
+                              {review.user_profiles?.username || 'User'}
+                            </Text>
+                            {review.play_status && (
+                              <View style={styles.reviewStatusBadge}>
+                                <Text style={styles.reviewStatusText}>
+                                  {review.play_status === 'playing' && '🎮 Playing'}
+                                  {review.play_status === 'completed' && '✅ Completed'}
+                                  {review.play_status === 'plan_to_play' && '📋 Plan to Play'}
+                                  {review.play_status === 'dropped' && '⏸️ Dropped'}
+                                  {review.play_status === 'not_played' && '📦 Not Played'}
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+                        </View>
+                      </View>
+                      <StarRating
+                        rating={review.rating / 2}
+                        size={16}
+                        showNumber
+                        color={RetroTheme.colors.primary}
+                      />
+                    </View>
+                    
+                    {/* Category Ratings Chips */}
+                    {(review.rating_story || review.rating_gameplay || review.rating_audio || 
+                      review.rating_visual || review.rating_joy) && (
+                      <View style={styles.reviewCategoryChips}>
+                        {RATING_CATEGORIES.map((category) => {
+                          const categoryRating = review[`rating_${category.id}`];
+                          if (!categoryRating || categoryRating < 1) return null;
+                          return (
+                            <View key={category.id} style={styles.reviewCategoryChip}>
+                              <Text style={styles.reviewCategoryIcon}>{category.icon}</Text>
+                              <Text style={styles.reviewCategoryValue}>{categoryRating.toFixed(1)}</Text>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    )}
+                    
+                    {review.review && (
+                      <Text style={styles.reviewItemText}>{review.review}</Text>
+                    )}
+                    <Text style={styles.reviewItemDate}>
+                      {new Date(review.created_at).toLocaleDateString()}
+                    </Text>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       {/* Image Modal */}
       <Modal
@@ -1029,6 +1236,33 @@ const styles = {
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
   },
+  categoryRatingsCompact: {
+    flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
+    justifyContent: 'center' as const,
+    marginTop: 8,
+    gap: 8,
+  },
+  compactCategoryItem: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    backgroundColor: RetroTheme.colors.layer1,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: RetroTheme.borderRadius.sm,
+    borderWidth: 1,
+    borderColor: RetroTheme.colors.borderLight,
+  },
+  compactCategoryIcon: {
+    fontSize: 14,
+    marginRight: 4,
+  },
+  compactCategoryRating: {
+    ...RetroTheme.text.caption,
+    fontSize: 12,
+    fontWeight: '600' as const,
+    color: RetroTheme.colors.primary,
+  },
   starsContainer: {
     flexDirection: 'row' as const,
     marginLeft: 8,
@@ -1056,6 +1290,22 @@ const styles = {
   reviewText: {
     ...RetroTheme.text.body,
     lineHeight: 20,
+  },
+  removeFromLibraryButton: {
+    marginTop: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: RetroTheme.borderRadius.md,
+    borderWidth: 2,
+    borderColor: '#F44336',
+    backgroundColor: 'transparent',
+    alignItems: 'center' as const,
+  },
+  removeFromLibraryText: {
+    ...RetroTheme.text.body,
+    fontSize: 14,
+    fontWeight: 'bold' as const,
+    color: '#F44336',
   },
   ratingsSection: {
     padding: 16,
@@ -1287,7 +1537,7 @@ const styles = {
   modalContent: {
     backgroundColor: RetroTheme.colors.layer2,
     borderRadius: RetroTheme.borderRadius.lg,
-    padding: 20,
+    padding: 16,
     width: Dimensions.get('window').width * 0.9,
     maxWidth: 400,
     borderWidth: 2,
@@ -1297,20 +1547,20 @@ const styles = {
   modalTitle: {
     ...RetroTheme.text.h2,
     textAlign: 'center' as const,
-    marginBottom: 20,
+    marginBottom: 12,
     color: RetroTheme.colors.primary,
   },
   modalRatingSection: {
     alignItems: 'center' as const,
-    marginBottom: 20,
+    marginBottom: 12,
   },
   modalLabel: {
     ...RetroTheme.text.body,
     fontWeight: 'bold' as const,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   modalReviewSection: {
-    marginBottom: 20,
+    marginBottom: 12,
   },
   modalScrollView: {
     maxHeight: Dimensions.get('window').height * 0.9,
@@ -1318,42 +1568,43 @@ const styles = {
   modalSubtitle: {
     ...RetroTheme.text.caption,
     textAlign: 'center' as const,
-    marginBottom: 16,
+    marginBottom: 12,
     color: RetroTheme.colors.textSecondary,
   },
   categoriesContainer: {
-    marginBottom: 20,
+    marginBottom: 12,
   },
   categoryRow: {
-    marginBottom: 16,
-    paddingBottom: 12,
+    marginBottom: 10,
+    paddingBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: RetroTheme.colors.borderLight,
   },
   categoryHeader: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   categoryIcon: {
-    fontSize: 20,
-    marginRight: 8,
+    fontSize: 18,
+    marginRight: 6,
   },
   categoryName: {
     ...RetroTheme.text.body,
     fontWeight: '600' as const,
     flex: 1,
     color: RetroTheme.colors.text,
+    fontSize: 14,
   },
   infoIcon: {
-    fontSize: 16,
+    fontSize: 14,
     color: RetroTheme.colors.primary,
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
   },
   overallSection: {
     alignItems: 'center' as const,
-    paddingVertical: 16,
-    marginBottom: 16,
+    paddingVertical: 12,
+    marginBottom: 12,
     backgroundColor: RetroTheme.colors.layer1,
     borderRadius: RetroTheme.borderRadius.md,
     borderWidth: 2,
@@ -1362,19 +1613,21 @@ const styles = {
   overallLabel: {
     ...RetroTheme.text.body,
     fontWeight: 'bold' as const,
-    marginBottom: 8,
+    marginBottom: 6,
     color: RetroTheme.colors.primary,
+    fontSize: 14,
   },
   reviewInput: {
     backgroundColor: RetroTheme.colors.layer1,
     borderWidth: 2,
     borderColor: RetroTheme.colors.borderLight,
     borderRadius: RetroTheme.borderRadius.md,
-    padding: 12,
+    padding: 10,
     ...RetroTheme.text.body,
     color: RetroTheme.colors.text,
     textAlignVertical: 'top' as const,
-    minHeight: 80,
+    minHeight: 60,
+    fontSize: 14,
   },
   modalActions: {
     flexDirection: 'row' as const,
@@ -1403,6 +1656,170 @@ const styles = {
   modalSaveText: {
     ...RetroTheme.text.button,
     textAlign: 'center' as const,
+  },
+  tapToViewReviews: {
+    ...RetroTheme.text.caption,
+    fontSize: 10,
+    color: RetroTheme.colors.primary,
+    marginTop: 4,
+    fontStyle: 'italic' as const,
+  },
+  // Community Reviews Modal Styles
+  communityReviewsModal: {
+    backgroundColor: RetroTheme.colors.layer2,
+    borderRadius: RetroTheme.borderRadius.lg,
+    width: Dimensions.get('window').width * 0.92,
+    maxHeight: Dimensions.get('window').height * 0.8,
+    borderWidth: 2,
+    borderColor: RetroTheme.colors.borderLight,
+    ...RetroTheme.shadows.large,
+  },
+  communityReviewsHeader: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+    padding: 16,
+    borderBottomWidth: 2,
+    borderBottomColor: RetroTheme.colors.borderLight,
+  },
+  communityReviewsTitle: {
+    ...RetroTheme.text.h2,
+    color: RetroTheme.colors.primary,
+  },
+  communityReviewsClose: {
+    fontSize: 24,
+    color: RetroTheme.colors.text,
+    fontWeight: 'bold' as const,
+    padding: 4,
+  },
+  communityReviewsLoading: {
+    padding: 40,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  communityReviewsEmpty: {
+    padding: 40,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  emptyReviewsText: {
+    ...RetroTheme.text.body,
+    color: RetroTheme.colors.textSecondary,
+  },
+  communityReviewsList: {
+    padding: 16,
+  },
+  communityReviewItem: {
+    backgroundColor: RetroTheme.colors.layer1,
+    borderRadius: RetroTheme.borderRadius.md,
+    borderWidth: 2,
+    borderColor: RetroTheme.colors.borderLight,
+    padding: 12,
+    marginBottom: 12,
+    ...RetroTheme.shadows.small,
+  },
+  reviewItemHeader: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+    marginBottom: 8,
+  },
+  reviewUserInfo: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+    flex: 1,
+  },
+  reviewUserDetails: {
+    flexDirection: 'column' as const,
+    gap: 2,
+    flex: 1,
+  },
+  reviewUserNameRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+    flexWrap: 'wrap' as const,
+  },
+  reviewUserAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: RetroTheme.colors.borderLight,
+  },
+  reviewUserAvatarPlaceholder: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: RetroTheme.colors.primary,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    borderWidth: 2,
+    borderColor: RetroTheme.colors.borderLight,
+  },
+  reviewUserAvatarText: {
+    ...RetroTheme.text.body,
+    fontSize: 14,
+    fontWeight: 'bold' as const,
+    color: RetroTheme.colors.background,
+  },
+  reviewUsername: {
+    ...RetroTheme.text.body,
+    fontWeight: 'bold' as const,
+    color: RetroTheme.colors.text,
+    fontSize: 14,
+  },
+  reviewStatusBadge: {
+    backgroundColor: RetroTheme.colors.layer2,
+    borderRadius: RetroTheme.borderRadius.sm,
+    borderWidth: 1,
+    borderColor: RetroTheme.colors.borderLight,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
+  reviewStatusText: {
+    ...RetroTheme.text.body,
+    fontSize: 9,
+    color: RetroTheme.colors.primary,
+    fontWeight: '600' as const,
+  },
+  reviewCategoryChips: {
+    flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
+    gap: 6,
+    marginBottom: 8,
+  },
+  reviewCategoryChip: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    backgroundColor: RetroTheme.colors.layer2,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: RetroTheme.borderRadius.sm,
+    borderWidth: 1,
+    borderColor: RetroTheme.colors.borderLight,
+  },
+  reviewCategoryIcon: {
+    fontSize: 12,
+    marginRight: 3,
+  },
+  reviewCategoryValue: {
+    ...RetroTheme.text.caption,
+    fontSize: 11,
+    fontWeight: '600' as const,
+    color: RetroTheme.colors.primary,
+  },
+  reviewItemText: {
+    ...RetroTheme.text.body,
+    lineHeight: 20,
+    marginBottom: 8,
+    color: RetroTheme.colors.text,
+  },
+  reviewItemDate: {
+    ...RetroTheme.text.caption,
+    fontSize: 11,
+    color: RetroTheme.colors.textSecondary,
   },
   imageModalOverlay: {
     flex: 1,

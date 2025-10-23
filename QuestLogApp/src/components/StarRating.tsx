@@ -39,8 +39,8 @@ export const StarRating: React.FC<StarRatingProps> = ({
       newRating = starIndex + 1;
     }
     
-    // Clamp between 0.5 and maxStars
-    newRating = Math.max(0.5, Math.min(maxStars, newRating));
+    // Clamp between 1.0 and maxStars (minimum 1 star)
+    newRating = Math.max(1.0, Math.min(maxStars, newRating));
     
     if (newRating !== rating) {
       onRatingChange(newRating);
@@ -72,7 +72,10 @@ export const StarRating: React.FC<StarRatingProps> = ({
     if (!interactive || !onRatingChange) return;
     
     const newRating = starIndex + (isHalf ? 0.5 : 1);
-    onRatingChange(newRating);
+    // Ensure minimum rating of 1.0
+    if (newRating >= 1.0) {
+      onRatingChange(newRating);
+    }
   };
 
   const renderStar = (index: number) => {

@@ -276,14 +276,11 @@ export class UserRatingService {
     limit: number = 10
   ): Promise<UserGameRating[]> {
     try {
+      // Use RPC or manual join since the foreign key relationship isn't auto-detected
       const { data, error } = await supabase
         .from('user_game_ratings')
         .select(`
-          *,
-          user_profiles (
-            username,
-            avatar_url
-          )
+          *
         `)
         .eq('igdb_game_id', igdbGameId)
         .not('review', 'is', null)
@@ -291,7 +288,63 @@ export class UserRatingService {
         .limit(limit);
 
       if (error) throw error;
-      return data || [];
+      
+      // Manually fetch user profiles for each review
+      if (data && data.length > 0) {
+        const userIds = [...new Set(data.map(r => r.user_id))]; // Remove duplicates
+        
+        console.log('🔍 Fetching user data for IDs:', userIds);
+        
+        // Fetch from user_profiles (public table, no RLS restrictions for viewing)
+        const { data: profiles, error: profilesError } = await supabase
+          .from('user_profiles')
+          .select('id, username, full_name, avatar_url')
+          .in('id', userIds);
+        
+        if (profilesError) {
+          console.error('Failed to fetch user profiles:', profilesError);
+        }
+        
+        console.log('📋 user_profiles query result:', profiles);
+        
+        // Merge profiles into reviews
+        const reviewsWithProfiles = data.map(review => {
+          const profile = profiles?.find(p => p.id === review.user_id);
+          
+          // Determine display name: username -> full_name -> 'Anonymous'
+          let displayName = 'Anonymous';
+          let avatarUrl = null;
+          
+          if (profile) {
+            if (profile.username && profile.username.trim()) {
+              displayName = profile.username;
+            } else if (profile.full_name && profile.full_name.trim()) {
+              displayName = profile.full_name;
+            }
+            avatarUrl = profile.avatar_url;
+          }
+          
+          console.log('👤 Review user mapping:', {
+            userId: review.user_id,
+            username: profile?.username,
+            fullName: profile?.full_name,
+            finalDisplayName: displayName
+          });
+          
+          return {
+            ...review,
+            user_profiles: {
+              id: review.user_id,
+              username: displayName,
+              avatar_url: avatarUrl
+            }
+          };
+        });
+        
+        return reviewsWithProfiles as any;
+      }
+      
+      return data as any || [];
     } catch (error) {
       console.error('Failed to get community reviews:', error);
       return [];
