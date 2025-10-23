@@ -784,22 +784,18 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
               )}
             </TouchableOpacity>
 
-            {/* MetaCritic Rating - Coming Soon */}
+            {/* MetaCritic Rating */}
             <View style={styles.ratingCard}>
               <Text style={styles.ratingSourceLabel}>MetaCritic</Text>
               <Text style={styles.ratingSourceValue}>-</Text>
               <Text style={styles.ratingSourceMax}>/100</Text>
-              <Text style={styles.ratingSourceVotes}>Coming Soon</Text>
-              <Text style={styles.comingSoonBadge}>🔄</Text>
             </View>
 
-            {/* OpenCritic Rating - Coming Soon */}
+            {/* OpenCritic Rating */}
             <View style={styles.ratingCard}>
               <Text style={styles.ratingSourceLabel}>OpenCritic</Text>
               <Text style={styles.ratingSourceValue}>-</Text>
               <Text style={styles.ratingSourceMax}>/100</Text>
-              <Text style={styles.ratingSourceVotes}>Coming Soon</Text>
-              <Text style={styles.comingSoonBadge}>🔄</Text>
             </View>
           </View>
         </View>
@@ -1568,11 +1564,6 @@ const styles = {
     color: RetroTheme.colors.textSecondary,
     marginTop: 4,
     textAlign: 'center' as const,
-  },
-  comingSoonBadge: {
-    fontSize: 16,
-    marginTop: 6,
-    color: RetroTheme.colors.primary,
   },
   section: {
     padding: 16,
