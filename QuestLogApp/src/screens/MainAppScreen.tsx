@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import GameSearchScreen from './GameSearchScreen';
 import GameDetailsScreen from './GameDetailsScreen';
 import LibraryScreen from './LibraryScreen';
+import ProfileScreen from './ProfileScreen';
 import IGDBService, { IGDBGame } from '../services/IGDBService';
 import UserRatingService, { UserGameLibraryEntry } from '../services/UserRatingService';
 import ActivityLogService, { ActivityLogEntry } from '../services/ActivityLogService';
@@ -376,10 +377,22 @@ const MainAppScreen: React.FC = () => {
     );
   }
 
+  if (currentView === 'profile') {
+    return (
+      <ProfileScreen
+        gameCount={gameCount}
+        onBack={() => setCurrentView('home')}
+        onSignOut={handleSignOut}
+        onNavigateToLibrary={() => setCurrentView('library')}
+        onNavigateToSearch={() => setCurrentView('search')}
+      />
+    );
+  }
+
   return (
     <View style={styles.container}>
-      {/* Header - Only show for home and profile views */}
-      {(currentView === 'home' || currentView === 'profile') && (
+      {/* Header - Only show for home view */}
+      {currentView === 'home' && (
         <View style={styles.header}>
           <View>
             <Text style={styles.greeting}>Welcome back!</Text>
@@ -491,47 +504,6 @@ const MainAppScreen: React.FC = () => {
               )}
             </View>
           </>
-        )}
-
-        {currentView === 'profile' && (
-          <View style={styles.profileContainer}>
-            <View style={styles.profileHeader}>
-              <TouchableOpacity
-                style={styles.backButton}
-                onPress={() => setCurrentView('home')}
-              >
-                <Text style={styles.backButtonText}>←</Text>
-              </TouchableOpacity>
-              <Text style={styles.profileTitle}>Profile</Text>
-            </View>
-            
-            <View style={styles.profileInfo}>
-              <Text style={styles.profileEmail}>{user?.email}</Text>
-              <Text style={styles.profileJoined}>Joined today</Text>
-            </View>
-
-            <View style={styles.profileStats}>
-              <Text style={styles.profileStatsTitle}>Gaming Stats</Text>
-              <View style={styles.profileStatsGrid}>
-                <View style={styles.profileStatItem}>
-                  <Text style={styles.profileStatNumber}>{userGames.length}</Text>
-                  <Text style={styles.profileStatLabel}>Games Added</Text>
-                </View>
-                <View style={styles.profileStatItem}>
-                  <Text style={styles.profileStatNumber}>0</Text>
-                  <Text style={styles.profileStatLabel}>Hours Played</Text>
-                </View>
-                <View style={styles.profileStatItem}>
-                  <Text style={styles.profileStatNumber}>0</Text>
-                  <Text style={styles.profileStatLabel}>Reviews Written</Text>
-                </View>
-                <View style={styles.profileStatItem}>
-                  <Text style={styles.profileStatNumber}>1</Text>
-                  <Text style={styles.profileStatLabel}>Current Level</Text>
-                </View>
-              </View>
-            </View>
-          </View>
         )}
       </ScrollView>
     </View>
@@ -931,69 +903,6 @@ const styles = {
   addGameButtonText: {
     ...RetroTheme.text.button,
     fontSize: 16,
-  },
-  profileContainer: {
-    paddingTop: 20,
-  },
-  profileHeader: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    marginBottom: 20,
-  },
-  profileTitle: {
-    fontSize: 20,
-    fontWeight: 'bold' as const,
-    color: RetroTheme.colors.text,
-  },
-  profileInfo: {
-    backgroundColor: RetroTheme.colors.layer2,
-    borderRadius: RetroTheme.borderRadius.md,
-    padding: 20,
-    marginBottom: 20,
-    borderWidth: 2,
-    borderColor: RetroTheme.colors.borderLight,
-    alignItems: 'center' as const,
-    ...RetroTheme.shadows.medium,
-  },
-  profileEmail: {
-    fontSize: 18,
-    fontWeight: 'bold' as const,
-    color: RetroTheme.colors.text,
-  },
-  profileJoined: {
-    fontSize: 12,
-    color: RetroTheme.colors.textSecondary,
-    marginTop: 4,
-  },
-  profileStats: {
-    marginBottom: 20,
-  },
-  profileStatsTitle: {
-    fontSize: 16,
-    fontWeight: 'bold' as const,
-    color: RetroTheme.colors.text,
-    marginBottom: 15,
-  },
-  profileStatsGrid: {
-    flexDirection: 'row' as const,
-    flexWrap: 'wrap' as const,
-    justifyContent: 'space-between' as const,
-  },
-  profileStatItem: {
-    backgroundColor: RetroTheme.colors.layer3,
-    borderRadius: RetroTheme.borderRadius.md,
-    padding: 15,
-    width: (screenWidth - 60) * 0.48,
-    marginBottom: 10,
-    borderWidth: 2,
-    borderColor: RetroTheme.colors.borderLight,
-    alignItems: 'center' as const,
-    ...RetroTheme.shadows.small,
-  },
-  profileStatNumber: {
-    fontSize: 20,
-    fontWeight: 'bold' as const,
-    color: RetroTheme.colors.primary,
   },
   profileStatLabel: {
     fontSize: 10,

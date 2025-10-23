@@ -10,7 +10,10 @@ import {
   FlatList,
   TextInput,
   Modal,
+  Platform,
+  Animated,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { RetroTheme } from '../theme/RetroTheme';
 import { IGDBGame, IGDBService } from '../services/IGDBService';
 import { UserRatingService, UserGameStatus, CategoryRatings } from '../services/UserRatingService';
@@ -89,6 +92,10 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
+  // Animation values
+  const ratingAnimValue = useMemo(() => new Animated.Value(0), []);
+  const reviewsAnimValue = useMemo(() => new Animated.Value(0), []);
+  
   // User interaction states
   const [userRating, setUserRating] = useState<number>(0);
   const [categoryRatings, setCategoryRatings] = useState<CategoryRatings>({
@@ -118,6 +125,7 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
   const [showCommunityReviews, setShowCommunityReviews] = useState(false);
   const [communityReviews, setCommunityReviews] = useState<any[]>([]);
   const [loadingReviews, setLoadingReviews] = useState(false);
+  const [communityReviewsFilter, setCommunityReviewsFilter] = useState<UserGameStatus | 'all'>('all');
 
   useEffect(() => {
     loadGameDetails();
@@ -129,6 +137,27 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
     }
     loadQuestLogRating();
   }, [user, game, gameId]);
+
+  // Trigger animations when rating or reviews load
+  useEffect(() => {
+    if (userRating > 0) {
+      Animated.timing(ratingAnimValue, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [userRating]);
+
+  useEffect(() => {
+    if (communityReviews.length > 0) {
+      Animated.timing(reviewsAnimValue, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [communityReviews]);
 
   const loadGameDetails = async () => {
     try {
@@ -473,6 +502,13 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
     }
   };
 
+  const getFilteredCommunityReviews = () => {
+    if (communityReviewsFilter === 'all') {
+      return communityReviews;
+    }
+    return communityReviews.filter(review => review.play_status === communityReviewsFilter);
+  };
+
   const getStatusTextColor = (status: UserGameStatus, isSelected: boolean) => {
     if (isSelected) {
       return '#FFFFFF';
@@ -525,22 +561,23 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
   const coverUrl = game.cover?.url?.replace('t_cover_big', 't_cover_big_2x');
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={onBack}>
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>
-          {game.name}
-        </Text>
-      </View>
+    <SafeAreaView style={styles.container}>
+      <View style={{ flex: 1 }}>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backButton} onPress={onBack}>
+            <Text style={styles.backButtonText}>←</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {game.name}
+          </Text>
+        </View>
 
-      <ScrollView 
-        style={styles.scrollView} 
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
+        <ScrollView 
+          style={styles.scrollView} 
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
         {/* Cover and Basic Info */}
         <View style={styles.heroSection}>
           {coverUrl ? (
@@ -577,10 +614,11 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
         {/* User Actions */}
         {user && (
           <View style={styles.userSection}>
-            {/* Library Status - No Label, just chips */}
+            {/* Library Status - Full Width Button Style */}
             <View style={styles.statusContainer}>
+              <Text style={styles.sectionTitle}>Game Status</Text>
               <View style={styles.statusChipsContainer}>
-                {(['plan_to_play', 'playing', 'completed', 'dropped', 'not_played'] as UserGameStatus[]).map((status) => (
+                {(['plan_to_play', 'playing', 'completed', 'dropped'] as UserGameStatus[]).map((status) => (
                   <TouchableOpacity
                     key={status}
                     style={[
@@ -592,12 +630,23 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
                     ]}
                     onPress={() => handleStatusChange(status)}
                   >
-                    <Text style={[
-                      styles.statusChipText,
-                      { color: getStatusTextColor(status, userStatus === status) }
-                    ]}>
-                      {getStatusLabel(status)}
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%' }}>
+                      <Text style={{ fontSize: 18, marginRight: 10 }}>
+                        {status === 'plan_to_play' && '📋'}
+                        {status === 'playing' && '🎮'}
+                        {status === 'completed' && '✅'}
+                        {status === 'dropped' && '⏸️'}
+                      </Text>
+                      <Text style={[
+                        styles.statusChipText,
+                        { color: getStatusTextColor(status, userStatus === status) }
+                      ]}>
+                        {getStatusLabel(status)}
+                      </Text>
+                      {userStatus === status && (
+                        <Text style={{ marginLeft: 'auto', fontSize: 16 }}>✓</Text>
+                      )}
+                    </View>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -605,7 +654,10 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
 
             {/* Rating Display (if exists) */}
             {userRating > 0 && (
-              <View style={styles.ratingDisplaySection}>
+              <Animated.View style={[
+                styles.ratingDisplaySection,
+                { opacity: ratingAnimValue }
+              ]}>
                 <View style={styles.ratingHeader}>
                   <Text style={styles.ratingLabel}>Your Rating:</Text>
                   <StarRating
@@ -633,6 +685,40 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
                     })}
                   </View>
                 )}
+              </Animated.View>
+            )}
+
+            {/* Empty Rating State - Show when not yet rated */}
+            {userRating === 0 && isInLibrary && questLogRatingCount > 0 && (
+              <View style={styles.emptyRatingState}>
+                <Text style={styles.emptyRatingIcon}>⭐</Text>
+                <Text style={styles.emptyRatingTitle}>Rate This Game</Text>
+                <Text style={styles.emptyRatingDescription}>
+                  Share your thoughts and see how your rating compares to the community
+                </Text>
+                
+                {/* Community Average Breakdown */}
+                {questLogRating !== null && (
+                  <View style={styles.communityAverageCard}>
+                    <Text style={styles.communityAverageLabel}>Community Average</Text>
+                    <View style={styles.communityAverageContent}>
+                      <Text style={styles.communityAverageRating}>
+                        {(questLogRating / 2).toFixed(1)}
+                      </Text>
+                      <Text style={styles.communityAverageMax}>/5</Text>
+                      <Text style={styles.communityAverageCount}>
+                        from {questLogRatingCount} {questLogRatingCount === 1 ? 'rating' : 'ratings'}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+                
+                <TouchableOpacity
+                  style={styles.rateNowButton}
+                  onPress={() => setShowRatingModal(true)}
+                >
+                  <Text style={styles.rateNowButtonText}>Rate Now →</Text>
+                </TouchableOpacity>
               </View>
             )}
 
@@ -698,20 +784,22 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
               )}
             </TouchableOpacity>
 
-            {/* MetaCritic Rating - Placeholder */}
+            {/* MetaCritic Rating - Coming Soon */}
             <View style={styles.ratingCard}>
               <Text style={styles.ratingSourceLabel}>MetaCritic</Text>
               <Text style={styles.ratingSourceValue}>-</Text>
               <Text style={styles.ratingSourceMax}>/100</Text>
-              <Text style={styles.ratingSourceVotes}>Not available</Text>
+              <Text style={styles.ratingSourceVotes}>Coming Soon</Text>
+              <Text style={styles.comingSoonBadge}>🔄</Text>
             </View>
 
-            {/* OpenCritic Rating - Placeholder */}
+            {/* OpenCritic Rating - Coming Soon */}
             <View style={styles.ratingCard}>
               <Text style={styles.ratingSourceLabel}>OpenCritic</Text>
               <Text style={styles.ratingSourceValue}>-</Text>
               <Text style={styles.ratingSourceMax}>/100</Text>
-              <Text style={styles.ratingSourceVotes}>Not available</Text>
+              <Text style={styles.ratingSourceVotes}>Coming Soon</Text>
+              <Text style={styles.comingSoonBadge}>🔄</Text>
             </View>
           </View>
         </View>
@@ -934,19 +1022,61 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
               </TouchableOpacity>
             </View>
 
+            {/* Status Filter Chips - Horizontal Scroll */}
+            <ScrollView 
+              style={styles.reviewFilterContainer}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.reviewFilterContentContainer}
+            >
+              {(['all', 'completed', 'playing', 'plan_to_play', 'dropped'] as (UserGameStatus | 'all')[]).map((status) => (
+                <TouchableOpacity
+                  key={status}
+                  style={[
+                    styles.reviewFilterChip,
+                    communityReviewsFilter === status && {
+                      backgroundColor: RetroTheme.colors.primary,
+                      borderColor: RetroTheme.colors.primary,
+                    }
+                  ]}
+                  onPress={() => setCommunityReviewsFilter(status)}
+                >
+                  <Text style={[
+                    styles.reviewFilterText,
+                    communityReviewsFilter === status && { color: RetroTheme.colors.background }
+                  ]}>
+                    {status === 'all' ? 'All' : getStatusLabel(status)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
             {loadingReviews ? (
               <View style={styles.communityReviewsLoading}>
                 <ActivityIndicator size="large" color={RetroTheme.colors.primary} />
                 <Text style={styles.loadingText}>Loading reviews...</Text>
               </View>
-            ) : communityReviews.length === 0 ? (
+            ) : getFilteredCommunityReviews().length === 0 ? (
               <View style={styles.communityReviewsEmpty}>
-                <Text style={styles.emptyReviewsText}>No reviews yet</Text>
+                <Text style={styles.emptyReviewsText}>
+                  {communityReviews.length === 0 ? 'No reviews yet' : 'No reviews match this filter'}
+                </Text>
               </View>
             ) : (
-              <ScrollView style={styles.communityReviewsList}>
-                {communityReviews.map((review: any) => (
-                  <View key={review.id} style={styles.communityReviewItem}>
+              <Animated.ScrollView 
+                style={[
+                  styles.communityReviewsList,
+                  { opacity: reviewsAnimValue }
+                ]}
+              >
+                {getFilteredCommunityReviews().map((review: any) => (
+                  <View 
+                    key={review.id} 
+                    style={[
+                      styles.communityReviewItem,
+                      review.user_id === user?.id && styles.userReviewItem
+                    ]}
+                  >
                     <View style={styles.reviewItemHeader}>
                       <View style={styles.reviewUserInfo}>
                         {review.user_profiles?.avatar_url ? (
@@ -964,7 +1094,7 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
                         <View style={styles.reviewUserDetails}>
                           <View style={styles.reviewUserNameRow}>
                             <Text style={styles.reviewUsername}>
-                              {review.user_profiles?.username || 'User'}
+                              {review.user_id === user?.id ? 'You' : (review.user_profiles?.username || 'User')}
                             </Text>
                             {review.play_status && (
                               <View style={styles.reviewStatusBadge}>
@@ -1013,7 +1143,7 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
                     </Text>
                   </View>
                 ))}
-              </ScrollView>
+              </Animated.ScrollView>
             )}
           </View>
         </View>
@@ -1063,7 +1193,8 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
       )}
 
       <AlertComponent />
-    </View>
+      </View>
+    </SafeAreaView>
   );
 };
 
@@ -1077,7 +1208,6 @@ const styles = {
     alignItems: 'center' as const,
     paddingHorizontal: 16,
     paddingVertical: 16,
-    paddingTop: 50,
     borderBottomWidth: 2,
     borderBottomColor: RetroTheme.colors.borderLight,
     backgroundColor: RetroTheme.colors.layer2,
@@ -1208,25 +1338,22 @@ const styles = {
     marginBottom: 16,
   },
   statusChipsContainer: {
-    flexDirection: 'row' as const,
-    flexWrap: 'wrap' as const,
-    justifyContent: 'space-between' as const,
+    flexDirection: 'column' as const,
+    gap: 10,
   },
   statusChip: {
-    paddingHorizontal: 8,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderRadius: RetroTheme.borderRadius.md,
     borderWidth: 2,
-    width: screenWidth * 0.43,
-    alignItems: 'center' as const,
+    alignItems: 'flex-start' as const,
     justifyContent: 'center' as const,
-    marginBottom: 8,
   },
   statusChipText: {
-    ...RetroTheme.text.caption,
-    fontSize: 12,
+    ...RetroTheme.text.body,
+    fontSize: 14,
     fontWeight: 'bold' as const,
-    textAlign: 'center' as const,
+    textAlign: 'left' as const,
   },
   ratingDisplaySection: {
     marginBottom: 12,
@@ -1238,6 +1365,89 @@ const styles = {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
+  },
+  emptyRatingState: {
+    backgroundColor: RetroTheme.colors.layer1,
+    borderRadius: RetroTheme.borderRadius.md,
+    borderWidth: 2,
+    borderColor: RetroTheme.colors.primary,
+    padding: 16,
+    marginTop: 12,
+    alignItems: 'center' as const,
+    ...RetroTheme.shadows.small,
+  },
+  emptyRatingIcon: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  emptyRatingTitle: {
+    ...RetroTheme.text.h3,
+    color: RetroTheme.colors.primary,
+    marginBottom: 6,
+    textAlign: 'center' as const,
+  },
+  emptyRatingDescription: {
+    ...RetroTheme.text.body,
+    fontSize: 13,
+    color: RetroTheme.colors.textSecondary,
+    marginBottom: 12,
+    textAlign: 'center' as const,
+    lineHeight: 18,
+  },
+  communityAverageCard: {
+    width: screenWidth - 80,
+    backgroundColor: RetroTheme.colors.layer2,
+    borderRadius: RetroTheme.borderRadius.sm,
+    borderWidth: 2,
+    borderColor: RetroTheme.colors.borderLight,
+    padding: 10,
+    marginBottom: 12,
+    alignItems: 'center' as const,
+  },
+  communityAverageLabel: {
+    ...RetroTheme.text.caption,
+    fontSize: 11,
+    color: RetroTheme.colors.textSecondary,
+    marginBottom: 6,
+    fontWeight: '600' as const,
+  },
+  communityAverageContent: {
+    flexDirection: 'row' as const,
+    alignItems: 'baseline' as const,
+    justifyContent: 'center' as const,
+  },
+  communityAverageRating: {
+    fontSize: 24,
+    fontWeight: 'bold' as const,
+    color: RetroTheme.colors.primary,
+    marginRight: 2,
+  },
+  communityAverageMax: {
+    ...RetroTheme.text.body,
+    fontSize: 12,
+    color: RetroTheme.colors.textSecondary,
+    marginRight: 8,
+  },
+  communityAverageCount: {
+    ...RetroTheme.text.caption,
+    fontSize: 10,
+    color: RetroTheme.colors.textSecondary,
+  },
+  rateNowButton: {
+    width: screenWidth - 80,
+    backgroundColor: RetroTheme.colors.primary,
+    borderRadius: RetroTheme.borderRadius.md,
+    paddingVertical: 12,
+    alignItems: 'center' as const,
+    borderWidth: 2,
+    borderColor: RetroTheme.colors.primary,
+    ...RetroTheme.shadows.small,
+  },
+  rateNowButtonText: {
+    ...RetroTheme.text.button,
+    color: RetroTheme.colors.background,
+    fontWeight: 'bold' as const,
+    fontSize: 14,
   },
   categoryRatingsCompact: {
     flexDirection: 'row' as const,
@@ -1358,6 +1568,11 @@ const styles = {
     color: RetroTheme.colors.textSecondary,
     marginTop: 4,
     textAlign: 'center' as const,
+  },
+  comingSoonBadge: {
+    fontSize: 16,
+    marginTop: 6,
+    color: RetroTheme.colors.primary,
   },
   section: {
     padding: 16,
@@ -1513,6 +1728,7 @@ const styles = {
     right: 0,
     paddingHorizontal: 16,
     paddingVertical: 12,
+    paddingBottom: Platform.OS === 'android' ? 24 : 12, // Extra padding for Android safe area
     backgroundColor: RetroTheme.colors.layer2,
     borderTopWidth: 2,
     borderTopColor: RetroTheme.colors.borderLight,
@@ -1685,6 +1901,32 @@ const styles = {
     borderBottomWidth: 2,
     borderBottomColor: RetroTheme.colors.borderLight,
   },
+  reviewFilterContainer: {
+    flexGrow: 0,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: RetroTheme.colors.borderLight,
+  },
+  reviewFilterContentContainer: {
+    gap: 8,
+    paddingRight: 16,
+  },
+  reviewFilterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: RetroTheme.borderRadius.sm,
+    borderWidth: 2,
+    borderColor: RetroTheme.colors.borderLight,
+    backgroundColor: 'transparent',
+    whiteSpace: 'nowrap' as const,
+  },
+  reviewFilterText: {
+    ...RetroTheme.text.caption,
+    fontSize: 12,
+    fontWeight: '600' as const,
+    color: RetroTheme.colors.text,
+  },
   communityReviewsTitle: {
     ...RetroTheme.text.h2,
     color: RetroTheme.colors.primary,
@@ -1721,6 +1963,16 @@ const styles = {
     marginBottom: 12,
     ...RetroTheme.shadows.small,
   },
+  userReviewItem: {
+    backgroundColor: RetroTheme.colors.layer1,
+    borderColor: RetroTheme.colors.primary,
+    borderWidth: 3,
+    shadowColor: RetroTheme.colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
   reviewItemHeader: {
     flexDirection: 'row' as const,
     justifyContent: 'space-between' as const,
@@ -1743,6 +1995,20 @@ const styles = {
     alignItems: 'center' as const,
     gap: 6,
     flexWrap: 'wrap' as const,
+  },
+  yourReviewBadge: {
+    backgroundColor: RetroTheme.colors.primary,
+    borderRadius: RetroTheme.borderRadius.sm,
+    borderWidth: 1,
+    borderColor: RetroTheme.colors.primary,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  yourReviewBadgeText: {
+    ...RetroTheme.text.body,
+    fontSize: 9,
+    color: RetroTheme.colors.background,
+    fontWeight: '700' as const,
   },
   reviewUserAvatar: {
     width: 32,

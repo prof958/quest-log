@@ -8,12 +8,12 @@ import {
   Platform,
   ScrollView,
   TouchableOpacity,
-  Alert,
   TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RetroTheme } from '../theme/RetroTheme';
 import { AuthService } from '../services/AuthService';
+import { useRetroAlert } from '../hooks/useRetroAlert';
 
 // Simple gaming controller icon component
 const GameControllerIcon = () => (
@@ -33,6 +33,8 @@ interface SignUpScreenProps {
 }
 
 export const SignUpScreen: React.FC<SignUpScreenProps> = ({ onBackToLogin }) => {
+  const { showAlert, AlertComponent } = useRetroAlert();
+  
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -48,23 +50,23 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ onBackToLogin }) => 
 
   const validateForm = () => {
     if (!formData.username.trim()) {
-      Alert.alert('Validation Error', 'Please enter a username');
+      showAlert('Validation Error', 'Please enter a username');
       return false;
     }
     if (!formData.email.trim()) {
-      Alert.alert('Validation Error', 'Please enter an email address');
+      showAlert('Validation Error', 'Please enter an email address');
       return false;
     }
     if (!formData.email.includes('@')) {
-      Alert.alert('Validation Error', 'Please enter a valid email address');
+      showAlert('Validation Error', 'Please enter a valid email address');
       return false;
     }
     if (formData.password.length < 6) {
-      Alert.alert('Validation Error', 'Password must be at least 6 characters long');
+      showAlert('Validation Error', 'Password must be at least 6 characters long');
       return false;
     }
     if (formData.password !== formData.confirmPassword) {
-      Alert.alert('Validation Error', 'Passwords do not match');
+      showAlert('Validation Error', 'Passwords do not match');
       return false;
     }
     return true;
@@ -85,14 +87,14 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ onBackToLogin }) => 
       
       if (result.error) {
         console.error('❌ Sign up failed:', result.error);
-        Alert.alert(
+        showAlert(
           'Sign Up Failed',
           result.error.message || 'An error occurred during sign up. Please try again.',
           [{ text: 'OK' }]
         );
       } else if (result.user) {
         console.log('✅ Sign up successful');
-        Alert.alert(
+        showAlert(
           'Account Created! 🎉',
           `Welcome to QuestLog, ${formData.username}! Check your email to confirm your account, then you can start logging your gaming adventures.`,
           [
@@ -106,7 +108,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ onBackToLogin }) => 
       
     } catch (error) {
       console.error('❌ Sign up error:', error);
-      Alert.alert(
+      showAlert(
         'Sign Up Failed',
         'An error occurred during sign up. Please try again.',
         [{ text: 'OK' }]
@@ -232,6 +234,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ onBackToLogin }) => 
           </ScrollView>
         </KeyboardAvoidingView>
       </LinearGradient>
+      <AlertComponent />
     </SafeAreaView>
   );
 };
