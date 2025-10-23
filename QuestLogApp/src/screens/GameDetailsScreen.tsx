@@ -292,11 +292,11 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
 
   const getStatusLabel = (status: UserGameStatus) => {
     switch (status) {
-      case 'completed': return '✅ Completed';
-      case 'playing': return '🎮 Playing';
-      case 'plan_to_play': return '📋 Plan to Play';
-      case 'dropped': return '❌ Dropped';
-      default: return '⚪ Not Played';
+      case 'completed': return 'Completed';
+      case 'playing': return 'Playing';
+      case 'plan_to_play': return 'Plan to Play';
+      case 'dropped': return 'Dropped';
+      default: return 'Not Played';
     }
   };
 
@@ -356,12 +356,11 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={onBack}>
-          <Text style={styles.backButtonText}>← Back</Text>
+          <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>
           {game.name}
         </Text>
-        <View style={styles.headerRight} />
       </View>
 
       <ScrollView 
@@ -397,17 +396,6 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
                     <Text style={styles.genreText}>{genre.name}</Text>
                   </View>
                 ))}
-              </View>
-            )}
-
-            {/* IGDB Rating */}
-            {game.rating && (
-              <View style={styles.igdbRating}>
-                <Text style={styles.ratingLabel}>IGDB Rating:</Text>
-                <Text style={styles.ratingValue}>{Math.round(game.rating)}/100</Text>
-                {game.rating_count && (
-                  <Text style={styles.ratingCount}>({game.rating_count} votes)</Text>
-                )}
               </View>
             )}
           </View>
@@ -461,6 +449,48 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
             )}
           </View>
         )}
+
+        {/* Ratings Section */}
+        <View style={styles.ratingsSection}>
+          <Text style={styles.sectionTitle}>Ratings</Text>
+          <View style={styles.ratingsGrid}>
+            {/* IGDB Rating */}
+            {game.rating && (
+              <View style={styles.ratingCard}>
+                <Text style={styles.ratingSourceLabel}>IGDB</Text>
+                <Text style={styles.ratingSourceValue}>{Math.round(game.rating)}</Text>
+                <Text style={styles.ratingSourceMax}>/100</Text>
+                {game.rating_count && (
+                  <Text style={styles.ratingSourceVotes}>{game.rating_count} votes</Text>
+                )}
+              </View>
+            )}
+
+            {/* QuestLog Rating - Placeholder */}
+            <View style={styles.ratingCard}>
+              <Text style={styles.ratingSourceLabel}>QuestLog</Text>
+              <Text style={styles.ratingSourceValue}>-</Text>
+              <Text style={styles.ratingSourceMax}>/10</Text>
+              <Text style={styles.ratingSourceVotes}>No ratings yet</Text>
+            </View>
+
+            {/* MetaCritic Rating - Placeholder */}
+            <View style={styles.ratingCard}>
+              <Text style={styles.ratingSourceLabel}>MetaCritic</Text>
+              <Text style={styles.ratingSourceValue}>-</Text>
+              <Text style={styles.ratingSourceMax}>/100</Text>
+              <Text style={styles.ratingSourceVotes}>Not available</Text>
+            </View>
+
+            {/* OpenCritic Rating - Placeholder */}
+            <View style={styles.ratingCard}>
+              <Text style={styles.ratingSourceLabel}>OpenCritic</Text>
+              <Text style={styles.ratingSourceValue}>-</Text>
+              <Text style={styles.ratingSourceMax}>/100</Text>
+              <Text style={styles.ratingSourceVotes}>Not available</Text>
+            </View>
+          </View>
+        </View>
 
         {/* Screenshots */}
         {game.screenshots && game.screenshots.length > 0 && (
@@ -520,20 +550,33 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
         {game.involved_companies && game.involved_companies.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Companies</Text>
-            {game.involved_companies
-              .filter(ic => ic.developer || ic.publisher)
-              .map((company, index) => (
-                <View key={index} style={styles.companyRow}>
-                  <Text style={styles.companyName}>{company.company.name}</Text>
-                  <Text style={styles.companyRole}>
-                    {company.developer && company.publisher
-                      ? 'Developer, Publisher'
-                      : company.developer
-                      ? 'Developer'
-                      : 'Publisher'}
-                  </Text>
-                </View>
-              ))}
+            <View style={styles.companiesContainer}>
+              {game.involved_companies
+                .filter(ic => ic.developer || ic.publisher)
+                .map((company, index) => (
+                  <TouchableOpacity 
+                    key={index} 
+                    style={styles.companyChip}
+                    onPress={() => Alert.alert(
+                      company.company.name,
+                      `${company.developer && company.publisher
+                        ? 'Developer & Publisher'
+                        : company.developer
+                        ? 'Developer'
+                        : 'Publisher'}`
+                    )}
+                  >
+                    <Text style={styles.companyChipText}>{company.company.name}</Text>
+                    <Text style={styles.companyChipRole}>
+                      {company.developer && company.publisher
+                        ? 'Dev & Pub'
+                        : company.developer
+                        ? 'Dev'
+                        : 'Pub'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+            </View>
           </View>
         )}
       </ScrollView>
@@ -546,7 +589,7 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
             onPress={() => setShowRatingModal(true)}
           >
             <Text style={styles.floatingRateButtonText}>
-              {userRating > 0 ? '⭐ Edit Rating & Review' : '⭐ Rate & Review'}
+              {userRating > 0 ? 'Edit Rating & Review' : 'Rate & Review'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -637,29 +680,32 @@ const styles = {
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderBottomWidth: 2,
-    borderBottomColor: RetroTheme.colors.primary,
-    backgroundColor: RetroTheme.colors.surface,
+    borderBottomColor: RetroTheme.colors.borderLight,
+    backgroundColor: RetroTheme.colors.layer2,
+    ...RetroTheme.shadows.small,
   },
   backButton: {
     padding: 8,
-    minWidth: 60,
+    minWidth: 40,
+    height: 40,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    marginRight: 8,
   },
   backButtonText: {
-    ...RetroTheme.text.body,
-    color: RetroTheme.colors.accent,
+    fontSize: 28,
+    color: RetroTheme.colors.primary,
     fontWeight: 'bold' as const,
+    lineHeight: 28,
   },
   headerTitle: {
     ...RetroTheme.text.body,
-    fontSize: 16,
+    fontSize: 18,
     flex: 1,
-    textAlign: 'center' as const,
-    marginHorizontal: 8,
     color: RetroTheme.colors.text,
     fontWeight: 'bold' as const,
-  },
-  headerRight: {
-    width: 60,
+    lineHeight: 24,
+    paddingTop: 2,
   },
   scrollView: {
     flex: 1,
@@ -670,26 +716,28 @@ const styles = {
   heroSection: {
     flexDirection: 'row' as const,
     padding: 16,
-    backgroundColor: RetroTheme.colors.surface,
+    backgroundColor: RetroTheme.colors.layer2,
     borderBottomWidth: 2,
-    borderBottomColor: RetroTheme.colors.primary,
+    borderBottomColor: RetroTheme.colors.borderLight,
   },
   coverImage: {
     width: 120,
     height: 160,
-    borderRadius: 8,
+    borderRadius: RetroTheme.borderRadius.md,
     borderWidth: 2,
-    borderColor: RetroTheme.colors.primary,
+    borderColor: RetroTheme.colors.borderLight,
+    ...RetroTheme.shadows.medium,
   },
   coverPlaceholder: {
     width: 120,
     height: 160,
-    borderRadius: 8,
+    borderRadius: RetroTheme.borderRadius.md,
     borderWidth: 2,
-    borderColor: RetroTheme.colors.primary,
-    backgroundColor: RetroTheme.colors.background,
+    borderColor: RetroTheme.colors.borderLight,
+    backgroundColor: RetroTheme.colors.layer1,
     justifyContent: 'center' as const,
     alignItems: 'center' as const,
+    ...RetroTheme.shadows.medium,
   },
   coverPlaceholderText: {
     fontSize: 40,
@@ -714,14 +762,15 @@ const styles = {
   },
   genreTag: {
     backgroundColor: RetroTheme.colors.primary,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
     borderRadius: 4,
-    marginRight: 8,
+    marginRight: 6,
     marginBottom: 4,
   },
   genreText: {
     ...RetroTheme.text.caption,
+    fontSize: 10,
     color: RetroTheme.colors.background,
     fontWeight: 'bold' as const,
   },
@@ -745,14 +794,14 @@ const styles = {
   },
   userSection: {
     padding: 16,
-    backgroundColor: RetroTheme.colors.surface,
+    backgroundColor: RetroTheme.colors.layer2,
     borderBottomWidth: 2,
-    borderBottomColor: RetroTheme.colors.primary,
+    borderBottomColor: RetroTheme.colors.borderLight,
   },
   sectionTitle: {
     ...RetroTheme.text.h3,
     marginBottom: 12,
-    color: RetroTheme.colors.accent,
+    color: RetroTheme.colors.secondary,
   },
   statusContainer: {
     marginBottom: 16,
@@ -765,9 +814,9 @@ const styles = {
   statusChip: {
     paddingHorizontal: 8,
     paddingVertical: 10,
-    borderRadius: 8,
+    borderRadius: RetroTheme.borderRadius.md,
     borderWidth: 2,
-    width: screenWidth * 0.45,
+    width: screenWidth * 0.43,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
     marginBottom: 8,
@@ -782,7 +831,7 @@ const styles = {
     marginBottom: 12,
     paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: RetroTheme.colors.primary + '30',
+    borderTopColor: RetroTheme.colors.borderLight,
   },
   ratingHeader: {
     flexDirection: 'row' as const,
@@ -799,12 +848,13 @@ const styles = {
     fontSize: 20,
   },
   reviewContainer: {
-    backgroundColor: RetroTheme.colors.background,
+    backgroundColor: RetroTheme.colors.layer1,
     padding: 12,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: RetroTheme.colors.primary,
+    borderRadius: RetroTheme.borderRadius.md,
+    borderWidth: 2,
+    borderColor: RetroTheme.colors.borderLight,
     marginTop: 8,
+    ...RetroTheme.shadows.small,
   },
   reviewLabel: {
     ...RetroTheme.text.caption,
@@ -815,20 +865,71 @@ const styles = {
     ...RetroTheme.text.body,
     lineHeight: 20,
   },
+  ratingsSection: {
+    padding: 16,
+    backgroundColor: RetroTheme.colors.layer2,
+    borderBottomWidth: 1,
+    borderBottomColor: RetroTheme.colors.borderLight,
+  },
+  ratingsGrid: {
+    flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
+    justifyContent: 'space-between' as const,
+  },
+  ratingCard: {
+    width: '48%' as const,
+    backgroundColor: RetroTheme.colors.layer3,
+    borderRadius: RetroTheme.borderRadius.md,
+    borderWidth: 2,
+    borderColor: RetroTheme.colors.borderLight,
+    padding: 12,
+    marginBottom: 12,
+    alignItems: 'center' as const,
+    ...RetroTheme.shadows.small,
+  },
+  ratingSourceLabel: {
+    ...RetroTheme.text.caption,
+    fontSize: 11,
+    color: RetroTheme.colors.textSecondary,
+    fontWeight: 'bold' as const,
+    textTransform: 'uppercase' as const,
+    marginBottom: 6,
+  },
+  ratingSourceValue: {
+    fontSize: 32,
+    fontWeight: 'bold' as const,
+    color: RetroTheme.colors.primary,
+    lineHeight: 36,
+  },
+  ratingSourceMax: {
+    ...RetroTheme.text.body,
+    fontSize: 14,
+    color: RetroTheme.colors.textSecondary,
+    marginTop: -4,
+  },
+  ratingSourceVotes: {
+    ...RetroTheme.text.caption,
+    fontSize: 10,
+    color: RetroTheme.colors.textSecondary,
+    marginTop: 4,
+    textAlign: 'center' as const,
+  },
   section: {
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: RetroTheme.colors.primary,
+    borderBottomColor: RetroTheme.colors.borderLight,
+    backgroundColor: RetroTheme.colors.layer2,
   },
   screenshotsList: {
     paddingVertical: 8,
   },
   screenshotItem: {
     marginRight: 12,
-    borderRadius: 8,
+    borderRadius: RetroTheme.borderRadius.md,
     borderWidth: 2,
-    borderColor: RetroTheme.colors.primary,
+    borderColor: RetroTheme.colors.borderLight,
     overflow: 'hidden' as const,
+    ...RetroTheme.shadows.medium,
   },
   screenshotImage: {
     width: 120,
@@ -847,7 +948,7 @@ const styles = {
   screenshotPlaceholder: {
     width: 120,
     height: 80,
-    backgroundColor: RetroTheme.colors.background,
+    backgroundColor: RetroTheme.colors.layer1,
     justifyContent: 'center' as const,
     alignItems: 'center' as const,
   },
@@ -872,18 +973,52 @@ const styles = {
     flexWrap: 'wrap' as const,
   },
   platformTag: {
-    backgroundColor: RetroTheme.colors.background,
+    backgroundColor: RetroTheme.colors.layer3,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: RetroTheme.colors.primary,
+    borderRadius: RetroTheme.borderRadius.sm,
+    borderWidth: 2,
+    borderColor: RetroTheme.colors.borderLight,
     marginRight: 8,
     marginBottom: 8,
+    ...RetroTheme.shadows.small,
   },
   platformText: {
     ...RetroTheme.text.caption,
     color: RetroTheme.colors.text,
+  },
+  companiesContainer: {
+    flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
+  },
+  companyChip: {
+    backgroundColor: RetroTheme.colors.layer3,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: RetroTheme.borderRadius.md,
+    borderWidth: 2,
+    borderColor: RetroTheme.colors.borderLight,
+    marginRight: 8,
+    marginBottom: 8,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    ...RetroTheme.shadows.small,
+  },
+  companyChipText: {
+    ...RetroTheme.text.body,
+    fontSize: 14,
+    color: RetroTheme.colors.text,
+    fontWeight: 'bold' as const,
+    marginRight: 6,
+  },
+  companyChipRole: {
+    ...RetroTheme.text.caption,
+    fontSize: 11,
+    color: RetroTheme.colors.textSecondary,
+    backgroundColor: RetroTheme.colors.layer1,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
   companyRow: {
     flexDirection: 'row' as const,
@@ -891,7 +1026,7 @@ const styles = {
     alignItems: 'center' as const,
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: RetroTheme.colors.primary + '30',
+    borderBottomColor: RetroTheme.colors.border,
   },
   companyName: {
     ...RetroTheme.text.body,
@@ -933,29 +1068,21 @@ const styles = {
     right: 0,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: RetroTheme.colors.surface,
+    backgroundColor: RetroTheme.colors.layer2,
     borderTopWidth: 2,
-    borderTopColor: RetroTheme.colors.primary,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    borderTopColor: RetroTheme.colors.borderLight,
+    ...RetroTheme.shadows.large,
   },
   floatingRateButton: {
-    backgroundColor: RetroTheme.colors.accent,
+    ...RetroTheme.buttons.primary,
     paddingVertical: 14,
-    borderRadius: 8,
+    borderRadius: RetroTheme.borderRadius.md,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
-    borderWidth: 2,
-    borderColor: RetroTheme.colors.primary,
   },
   floatingRateButtonText: {
-    ...RetroTheme.text.body,
+    ...RetroTheme.text.button,
     fontSize: 16,
-    color: RetroTheme.colors.background,
-    fontWeight: 'bold' as const,
   },
   // Modal styles
   modalOverlay: {
@@ -966,13 +1093,14 @@ const styles = {
     padding: 20,
   },
   modalContent: {
-    backgroundColor: RetroTheme.colors.surface,
-    borderRadius: 12,
+    backgroundColor: RetroTheme.colors.layer2,
+    borderRadius: RetroTheme.borderRadius.lg,
     padding: 20,
     width: Dimensions.get('window').width * 0.9,
     maxWidth: 400,
-    borderWidth: 3,
-    borderColor: RetroTheme.colors.primary,
+    borderWidth: 2,
+    borderColor: RetroTheme.colors.borderLight,
+    ...RetroTheme.shadows.large,
   },
   modalTitle: {
     ...RetroTheme.text.h2,
@@ -993,10 +1121,10 @@ const styles = {
     marginBottom: 20,
   },
   reviewInput: {
-    backgroundColor: RetroTheme.colors.background,
+    backgroundColor: RetroTheme.colors.layer1,
     borderWidth: 2,
-    borderColor: RetroTheme.colors.primary,
-    borderRadius: 6,
+    borderColor: RetroTheme.colors.borderLight,
+    borderRadius: RetroTheme.borderRadius.md,
     padding: 12,
     ...RetroTheme.text.body,
     color: RetroTheme.colors.text,
@@ -1008,31 +1136,27 @@ const styles = {
     justifyContent: 'space-between' as const,
   },
   modalCancelButton: {
-    backgroundColor: 'transparent',
+    ...RetroTheme.buttons.outlined,
     paddingHorizontal: 20,
     paddingVertical: 12,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: RetroTheme.colors.secondary,
+    borderRadius: RetroTheme.borderRadius.md,
     flex: 0.45,
   },
   modalCancelText: {
     ...RetroTheme.text.body,
-    color: RetroTheme.colors.secondary,
+    color: RetroTheme.colors.primary,
     fontWeight: 'bold' as const,
     textAlign: 'center' as const,
   },
   modalSaveButton: {
-    backgroundColor: RetroTheme.colors.accent,
+    ...RetroTheme.buttons.primary,
     paddingHorizontal: 20,
     paddingVertical: 12,
-    borderRadius: 6,
+    borderRadius: RetroTheme.borderRadius.md,
     flex: 0.45,
   },
   modalSaveText: {
-    ...RetroTheme.text.body,
-    color: RetroTheme.colors.background,
-    fontWeight: 'bold' as const,
+    ...RetroTheme.text.button,
     textAlign: 'center' as const,
   },
   imageModalOverlay: {

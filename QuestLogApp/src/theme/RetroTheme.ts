@@ -19,13 +19,21 @@ export const RetroTheme = {
     // Status colors
     success: '#51cf66',      // Friendly green
     warning: '#ffd43b',      // Warm yellow
-    error: '#ff6b6b',        // Friendly red
+    error: '#d63447',        // Deeper red, coherent with warm palette
+    danger: '#d63447',       // Alias for error
     
     // UI elements
     border: '#3d3426',       // Warm border
+    borderLight: '#4a3f2a',  // Lighter border for depth
     input: '#2c241a',        // Input backgrounds
     button: '#eca413',       // Golden button
     buttonSecondary: '#4a3f2a', // Secondary button
+    
+    // Depth layers (for creating visual hierarchy)
+    layer0: '#1a1410',       // Deepest layer
+    layer1: '#221c10',       // Background
+    layer2: '#2c241a',       // Surface
+    layer3: '#3d3426',       // Elevated surface
   },
   
   fonts: {
@@ -51,16 +59,64 @@ export const RetroTheme = {
   
   shadows: {
     small: {
+      shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.25,
-      shadowRadius: 3.84,
-      elevation: 5,
+      shadowOpacity: 0.3,
+      shadowRadius: 3,
+      elevation: 3,
     },
     medium: {
+      shadowColor: '#000',
       shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.30,
-      shadowRadius: 4.65,
-      elevation: 8,
+      shadowOpacity: 0.4,
+      shadowRadius: 5,
+      elevation: 6,
+    },
+    large: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.5,
+      shadowRadius: 8,
+      elevation: 10,
+    },
+  },
+  
+  // Button styles with depth
+  buttons: {
+    primary: {
+      backgroundColor: '#eca413',
+      borderWidth: 2,
+      borderColor: '#3d3426',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.4,
+      shadowRadius: 4,
+      elevation: 5,
+    },
+    secondary: {
+      backgroundColor: '#4a3f2a',
+      borderWidth: 2,
+      borderColor: '#3d3426',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.3,
+      shadowRadius: 3,
+      elevation: 3,
+    },
+    danger: {
+      backgroundColor: '#d63447',
+      borderWidth: 2,
+      borderColor: '#3d3426',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.4,
+      shadowRadius: 4,
+      elevation: 5,
+    },
+    outlined: {
+      backgroundColor: 'transparent',
+      borderWidth: 2,
+      borderColor: '#eca413',
     },
   },
   

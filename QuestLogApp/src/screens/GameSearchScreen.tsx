@@ -224,55 +224,22 @@ const GameSearchScreen: React.FC<GameSearchScreenProps> = ({ onGameSelect, onBac
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        {onBack && (
-          <TouchableOpacity style={styles.backButton} onPress={onBack}>
-            <Text style={styles.backButtonText}>← Back</Text>
-          </TouchableOpacity>
-        )}
-        <Text style={styles.title}>Search Games (IGDB)</Text>
-        <Text style={styles.subtitle}>500k+ games database</Text>
-        
-        {/* Cache Stats Toggle */}
-        <TouchableOpacity 
-          style={styles.cacheStatsToggle} 
-          onPress={() => setShowCacheStats(!showCacheStats)}
-        >
-          <Text style={styles.cacheStatsToggleText}>
-            📊 Cache: {getCacheStats().hitRate}%
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Cache Stats Panel */}
-      {showCacheStats && (
-        <View style={styles.cacheStatsPanel}>
-          <Text style={styles.cacheStatsTitle}>Cache Performance</Text>
-          <View style={styles.cacheStatsGrid}>
-            <View style={styles.cacheStat}>
-              <Text style={styles.cacheStatValue}>{getCacheStats().hitRate}%</Text>
-              <Text style={styles.cacheStatLabel}>Hit Rate</Text>
-            </View>
-            <View style={styles.cacheStat}>
-              <Text style={styles.cacheStatValue}>{getCacheStats().avgResponseTime}ms</Text>
-              <Text style={styles.cacheStatLabel}>Avg Response</Text>
-            </View>
-            <View style={styles.cacheStat}>
-              <Text style={styles.cacheStatValue}>{getCacheStats().totalRequests}</Text>
-              <Text style={styles.cacheStatLabel}>Requests</Text>
-            </View>
-            <View style={styles.cacheStat}>
-              <Text style={styles.cacheStatValue}>{getCacheStats().efficiency}</Text>
-              <Text style={styles.cacheStatLabel}>Efficiency</Text>
-            </View>
+        <View style={styles.headerTop}>
+          {onBack && (
+            <TouchableOpacity style={styles.backButton} onPress={onBack}>
+              <Text style={styles.backButtonText}>←</Text>
+            </TouchableOpacity>
+          )}
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.title}>Search Game</Text>
           </View>
         </View>
-      )}
-
+      </View>
       {/* Search Input */}
       <View style={styles.searchContainer}>
         <TextInput
           style={styles.searchInput}
-          placeholder="Search for games... (Press Enter to search)"
+          placeholder="Search for games..."
           placeholderTextColor={RetroTheme.colors.textSecondary}
           value={searchQuery}
           onChangeText={handleSearchChange}
@@ -326,32 +293,43 @@ const styles = {
     paddingTop: 40,
   },
   header: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    paddingTop: 16,
+    backgroundColor: RetroTheme.colors.layer2,
+    borderBottomWidth: 2,
+    borderBottomColor: RetroTheme.colors.borderLight,
+    ...RetroTheme.shadows.small,
+  },
+  headerTop: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+  },
+  headerTitleContainer: {
+    flex: 1,
+    marginLeft: 12,
   },
   backButton: {
-    marginRight: 15,
+    padding: 8,
+    minWidth: 40,
+    height: 40,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
   },
   backButtonText: {
     color: RetroTheme.colors.primary,
-    fontSize: 16,
+    fontSize: 28,
     fontWeight: 'bold' as const,
+    lineHeight: 28,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold' as const,
     color: RetroTheme.colors.text,
   },
-  subtitle: {
-    fontSize: 12,
-    color: RetroTheme.colors.textSecondary,
-    textAlign: 'center' as const,
-    marginTop: 4,
-  },
   searchContainer: {
     paddingHorizontal: 20,
+    paddingTop: 16,
     marginBottom: 20,
     position: 'relative' as const,
   },

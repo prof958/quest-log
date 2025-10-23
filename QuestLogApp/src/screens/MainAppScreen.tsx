@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Dimensions, Image } from 'react-native';
 import { RetroTheme } from '../theme/RetroTheme';
+
+const { width: screenWidth } = Dimensions.get('window');
 import { useAuth } from '../context/AuthContext';
 import GameSearchScreen from './GameSearchScreen';
 import GameDetailsScreen from './GameDetailsScreen';
+import LibraryScreen from './LibraryScreen';
 import IGDBService, { IGDBGame } from '../services/IGDBService';
 import UserRatingService, { UserGameLibraryEntry } from '../services/UserRatingService';
 
@@ -23,6 +26,27 @@ const MainAppScreen: React.FC = () => {
   const [userGames, setUserGames] = useState<LibraryGameData[]>([]);
   const [selectedGameId, setSelectedGameId] = useState<number | null>(null);
   const [loadingLibrary, setLoadingLibrary] = useState(false);
+
+  // Helper functions for status
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed': return '#4CAF50';
+      case 'playing': return '#2196F3';
+      case 'plan_to_play': return '#FF9800';
+      case 'dropped': return '#F44336';
+      default: return '#9E9E9E';
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'completed': return 'Completed';
+      case 'playing': return 'Playing';
+      case 'plan_to_play': return 'Plan to Play';
+      case 'dropped': return 'Dropped';
+      default: return 'Not Played';
+    }
+  };
 
   // Load library when switching to library or home view
   useEffect(() => {
@@ -97,6 +121,12 @@ const MainAppScreen: React.FC = () => {
     }
   };
 
+  const handleLibraryGameSelect = (gameId: number) => {
+    console.log(`🎮 Game selected from library: ${gameId}`);
+    setSelectedGameId(gameId);
+    setCurrentView('gameDetails');
+  };
+
   const handleSignOut = async () => {
     try {
       console.log('👋 Signing out...');
@@ -125,18 +155,29 @@ const MainAppScreen: React.FC = () => {
     );
   }
 
+  if (currentView === 'library') {
+    return (
+      <LibraryScreen
+        onGameSelect={handleLibraryGameSelect}
+        onBack={() => setCurrentView('home')}
+      />
+    );
+  }
+
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Welcome back!</Text>
-          <Text style={styles.username}>{user?.email}</Text>
+      {/* Header - Only show for home and profile views */}
+      {(currentView === 'home' || currentView === 'profile') && (
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.greeting}>Welcome back!</Text>
+            <Text style={styles.username}>{user?.email}</Text>
+          </View>
+          <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
+            <Text style={styles.signOutText}>Sign Out</Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-          <Text style={styles.signOutText}>Sign Out</Text>
-        </TouchableOpacity>
-      </View>
+      )}
 
       {/* Main Content */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -232,62 +273,6 @@ const MainAppScreen: React.FC = () => {
           </>
         )}
 
-        {currentView === 'library' && (
-          <View style={styles.libraryContainer}>
-            <View style={styles.libraryHeader}>
-              <TouchableOpacity
-                style={styles.backButton}
-                onPress={() => setCurrentView('home')}
-              >
-                <Text style={styles.backButtonText}>← Back</Text>
-              </TouchableOpacity>
-              <Text style={styles.sectionTitle}>My Library</Text>
-            </View>
-            
-            {loadingLibrary ? (
-              <View style={styles.emptyLibrary}>
-                <ActivityIndicator size="large" color={RetroTheme.colors.primary} />
-                <Text style={styles.emptyLibrarySubtext}>Loading your library...</Text>
-              </View>
-            ) : userGames.length > 0 ? (
-              userGames.map((gameData, index) => (
-                <TouchableOpacity
-                  key={`${gameData.igdbGameId}-${index}`}
-                  style={styles.libraryItem}
-                  onPress={() => {
-                    setSelectedGameId(gameData.igdbGameId);
-                    setCurrentView('gameDetails');
-                  }}
-                >
-                  <View style={styles.libraryItemContent}>
-                    <Text style={styles.libraryGameName}>
-                      {gameData.game?.name || 'Loading...'}
-                    </Text>
-                    <Text style={styles.libraryGameInfo}>
-                      Status: {gameData.status}
-                      {gameData.rating ? ` • Rating: ${Math.round(gameData.rating / 2)}/5 ⭐` : ''}
-                    </Text>
-                    <Text style={styles.libraryGameDate}>
-                      Added {new Date(gameData.addedAt).toLocaleDateString()}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))
-            ) : (
-              <View style={styles.emptyLibrary}>
-                <Text style={styles.emptyLibraryText}>Your library is empty</Text>
-                <Text style={styles.emptyLibrarySubtext}>Add games to start tracking your gaming journey!</Text>
-                <TouchableOpacity
-                  style={styles.addGameButton}
-                  onPress={() => setCurrentView('search')}
-                >
-                  <Text style={styles.addGameButtonText}>Add Your First Game</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-        )}
-
         {currentView === 'profile' && (
           <View style={styles.profileContainer}>
             <View style={styles.profileHeader}>
@@ -295,7 +280,7 @@ const MainAppScreen: React.FC = () => {
                 style={styles.backButton}
                 onPress={() => setCurrentView('home')}
               >
-                <Text style={styles.backButtonText}>← Back</Text>
+                <Text style={styles.backButtonText}>←</Text>
               </TouchableOpacity>
               <Text style={styles.sectionTitle}>Profile</Text>
             </View>
@@ -344,7 +329,7 @@ const styles = {
     justifyContent: 'space-between' as const,
     alignItems: 'center' as const,
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: RetroTheme.colors.border,
   },
@@ -380,7 +365,7 @@ const styles = {
     marginBottom: 25,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold' as const,
     color: RetroTheme.colors.text,
     marginBottom: 15,
@@ -491,46 +476,200 @@ const styles = {
     marginTop: 4,
   },
   libraryContainer: {
-    paddingTop: 20,
+    flex: 1,
   },
   libraryHeader: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
-    marginBottom: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: RetroTheme.colors.layer2,
+    borderBottomWidth: 2,
+    borderBottomColor: RetroTheme.colors.borderLight,
+    ...RetroTheme.shadows.small,
+  },
+  libraryHeaderContent: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  libraryTitle: {
+    fontSize: 22,
+    fontWeight: 'bold' as const,
+    color: RetroTheme.colors.text,
+  },
+  libraryCount: {
+    fontSize: 13,
+    color: RetroTheme.colors.textSecondary,
+    marginTop: 2,
+  },
+  filterContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: RetroTheme.colors.layer2,
+    borderBottomWidth: 1,
+    borderBottomColor: RetroTheme.colors.border,
+  },
+  filterDropdownButton: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    backgroundColor: RetroTheme.colors.surface,
+    borderWidth: 2,
+    borderColor: RetroTheme.colors.borderLight,
+    borderRadius: RetroTheme.borderRadius.md,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    ...RetroTheme.shadows.small,
+  },
+  filterDropdownLabel: {
+    fontSize: 14,
+    fontWeight: 'bold' as const,
+    color: RetroTheme.colors.textSecondary,
+    marginRight: 8,
+  },
+  filterDropdownValue: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: 'bold' as const,
+    color: RetroTheme.colors.text,
+  },
+  filterDropdownArrow: {
+    fontSize: 12,
+    color: RetroTheme.colors.primary,
+    marginLeft: 8,
+  },
+  filterDropdownMenu: {
+    marginTop: 8,
+    backgroundColor: RetroTheme.colors.surface,
+    borderWidth: 2,
+    borderColor: RetroTheme.colors.borderLight,
+    borderRadius: RetroTheme.borderRadius.md,
+    ...RetroTheme.shadows.medium,
+  },
+  filterDropdownItem: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: RetroTheme.colors.border,
+  },
+  filterDropdownItemActive: {
+    backgroundColor: RetroTheme.colors.primary + '20',
+  },
+  filterDropdownItemText: {
+    fontSize: 14,
+    color: RetroTheme.colors.text,
+  },
+  filterDropdownItemTextActive: {
+    fontWeight: 'bold' as const,
+    color: RetroTheme.colors.primary,
+  },
+  filterDropdownItemCount: {
+    fontSize: 12,
+    fontWeight: 'bold' as const,
+    color: RetroTheme.colors.textSecondary,
+    backgroundColor: RetroTheme.colors.layer3,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    minWidth: 24,
+    textAlign: 'center' as const,
+  },
+  libraryScroll: {
+    flex: 1,
+  },
+  libraryScrollContent: {
+    padding: 16,
+  },
+  libraryGameCard: {
+    flexDirection: 'row' as const,
+    backgroundColor: RetroTheme.colors.layer2,
+    borderRadius: RetroTheme.borderRadius.md,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: RetroTheme.colors.borderLight,
+    ...RetroTheme.shadows.medium,
+  },
+  libraryGameCover: {
+    width: 70,
+    height: 90,
+    borderRadius: RetroTheme.borderRadius.sm,
+    marginRight: 12,
+  },
+  libraryGameCoverPlaceholder: {
+    width: 70,
+    height: 90,
+    borderRadius: RetroTheme.borderRadius.sm,
+    marginRight: 12,
+    backgroundColor: RetroTheme.colors.layer1,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    borderWidth: 2,
+    borderColor: RetroTheme.colors.border,
+  },
+  libraryGameCoverPlaceholderText: {
+    fontSize: 28,
+  },
+  libraryGameInfo: {
+    flex: 1,
+    justifyContent: 'space-between' as const,
+  },
+  libraryStatusBadge: {
+    alignSelf: 'flex-start' as const,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    marginTop: 6,
+  },
+  libraryStatusText: {
+    fontSize: 11,
+    fontWeight: 'bold' as const,
+    color: '#FFFFFF',
+  },
+  libraryRating: {
+    marginTop: 4,
+  },
+  libraryRatingText: {
+    fontSize: 14,
+    color: RetroTheme.colors.secondary,
   },
   backButton: {
-    marginRight: 15,
+    padding: 8,
+    minWidth: 40,
+    height: 40,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
   },
   backButtonText: {
     color: RetroTheme.colors.primary,
-    fontSize: 16,
+    fontSize: 28,
     fontWeight: 'bold' as const,
+    lineHeight: 28,
   },
   libraryItem: {
-    backgroundColor: RetroTheme.colors.surface,
-    borderRadius: 8,
+    backgroundColor: RetroTheme.colors.layer2,
+    borderRadius: RetroTheme.borderRadius.md,
     padding: 16,
     marginBottom: 10,
     borderWidth: 2,
-    borderColor: RetroTheme.colors.border,
+    borderColor: RetroTheme.colors.borderLight,
+    ...RetroTheme.shadows.medium,
   },
   libraryItemContent: {
     flex: 1,
   },
   libraryGameName: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold' as const,
     color: RetroTheme.colors.text,
-  },
-  libraryGameInfo: {
-    fontSize: 12,
-    color: RetroTheme.colors.textSecondary,
-    marginTop: 4,
+    lineHeight: 18,
   },
   libraryGameDate: {
     fontSize: 10,
     color: RetroTheme.colors.textSecondary,
-    marginTop: 2,
+    marginTop: 4,
   },
   emptyLibrary: {
     alignItems: 'center' as const,
@@ -549,15 +688,14 @@ const styles = {
     marginBottom: 20,
   },
   addGameButton: {
-    backgroundColor: RetroTheme.colors.primary,
+    ...RetroTheme.buttons.primary,
     paddingHorizontal: 20,
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: RetroTheme.borderRadius.md,
   },
   addGameButtonText: {
-    color: 'white',
+    ...RetroTheme.text.button,
     fontSize: 16,
-    fontWeight: 'bold' as const,
   },
   profileContainer: {
     paddingTop: 20,
@@ -568,13 +706,14 @@ const styles = {
     marginBottom: 20,
   },
   profileInfo: {
-    backgroundColor: RetroTheme.colors.surface,
-    borderRadius: 8,
+    backgroundColor: RetroTheme.colors.layer2,
+    borderRadius: RetroTheme.borderRadius.md,
     padding: 20,
     marginBottom: 20,
     borderWidth: 2,
-    borderColor: RetroTheme.colors.border,
+    borderColor: RetroTheme.colors.borderLight,
     alignItems: 'center' as const,
+    ...RetroTheme.shadows.medium,
   },
   profileEmail: {
     fontSize: 18,
@@ -601,14 +740,15 @@ const styles = {
     justifyContent: 'space-between' as const,
   },
   profileStatItem: {
-    backgroundColor: RetroTheme.colors.surface,
-    borderRadius: 8,
+    backgroundColor: RetroTheme.colors.layer3,
+    borderRadius: RetroTheme.borderRadius.md,
     padding: 15,
-    width: '48%' as const,
+    width: (screenWidth - 60) * 0.48,
     marginBottom: 10,
     borderWidth: 2,
-    borderColor: RetroTheme.colors.border,
+    borderColor: RetroTheme.colors.borderLight,
     alignItems: 'center' as const,
+    ...RetroTheme.shadows.small,
   },
   profileStatNumber: {
     fontSize: 20,
