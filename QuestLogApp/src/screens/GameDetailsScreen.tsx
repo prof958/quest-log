@@ -96,13 +96,17 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
   const [showImageModal, setShowImageModal] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string>('');
   const [expandedDescription, setExpandedDescription] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     loadGameDetails();
-    if (user) {
+  }, [gameId]);
+
+  useEffect(() => {
+    if (user && game) {
       loadUserGameData();
     }
-  }, [gameId, user]);
+  }, [user, game]);
 
   const loadGameDetails = async () => {
     try {
@@ -124,11 +128,15 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
   };
 
   const loadUserGameData = async () => {
-    if (!user || !game) return;
+    if (!user) return;
 
     try {
+      console.log('👤 Loading user game data for game ID:', gameId);
       const userGame = await UserRatingService.getInstance().getUserGame(gameId);
+      
       if (userGame) {
+        console.log('✅ Found user game data:', userGame);
+        
         // userGame.rating is a UserGameRating object or array
         const rating = userGame.rating;
         let ratingValue = 0;
@@ -139,13 +147,24 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
           ratingValue = rating.rating || 0;
           setUserReview(rating.review || '');
         }
+        
         // Convert from 10-point scale to 5-star scale for display
-        setUserRating(Math.round(ratingValue / 2));
+        const starRating = Math.round(ratingValue / 2);
+        console.log('⭐ Setting user rating:', starRating, 'stars (from', ratingValue, '/10)');
+        setUserRating(starRating);
+        
+        console.log('📊 Setting user status:', userGame.status);
         setUserStatus(userGame.status as UserGameStatus);
         setIsInLibrary(true);
+      } else {
+        console.log('ℹ️ No user game data found - resetting to defaults');
+        setUserRating(0);
+        setUserReview('');
+        setUserStatus('not_played');
+        setIsInLibrary(false);
       }
     } catch (err) {
-      console.error('Failed to load user game data:', err);
+      console.error('❌ Failed to load user game data:', err);
     }
   };
 
@@ -197,6 +216,7 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
     if (!user || !game) return;
 
     try {
+      setIsSaving(true);
       if (!isInLibrary) {
         // Add to library first
         await UserRatingService.getInstance().addGameToLibrary(gameId, newStatus);
@@ -207,9 +227,12 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
       }
       
       setUserStatus(newStatus);
+      console.log('✅ Status updated successfully to:', newStatus);
     } catch (err) {
       console.error('Failed to update game status:', err);
       Alert.alert('Error', 'Failed to update game status');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -239,6 +262,8 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
       const ratingOutOf10 = userRating * 2;
       console.log('Converted rating (1-10 scale):', ratingOutOf10);
 
+      setIsSaving(true);
+      
       if (!isInLibrary) {
         console.log('📚 Adding to library first...');
         const libraryResult = await UserRatingService.getInstance().addGameToLibrary(gameId, userStatus);
@@ -257,11 +282,17 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
       console.log('✅ Rating save result:', ratingResult);
       
       setShowRatingModal(false);
+      
+      // Reload user game data to ensure UI reflects latest state
+      await loadUserGameData();
+      
       Alert.alert('Success', 'Your rating has been saved!');
     } catch (err) {
       console.error('❌ Failed to save rating:', err);
       console.error('Error details:', JSON.stringify(err, null, 2));
       Alert.alert('Error', `Failed to save rating: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -665,6 +696,16 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
           )}
         </View>
       </Modal>
+
+      {/* Loading Overlay */}
+      {isSaving && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="large" color={RetroTheme.colors.primary} />
+            <Text style={styles.loadingOverlayText}>Saving...</Text>
+          </View>
+        </View>
+      )}
     </View>
   );
 };
@@ -748,6 +789,7 @@ const styles = {
   },
   gameTitle: {
     ...RetroTheme.text.h2,
+    marginTop: 12,
     marginBottom: 8,
   },
   releaseDate: {
@@ -836,6 +878,7 @@ const styles = {
   ratingHeader: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
+    justifyContent: 'center' as const,
   },
   starsContainer: {
     flexDirection: 'row' as const,
@@ -1185,6 +1228,31 @@ const styles = {
   fullScreenImage: {
     width: Dimensions.get('window').width * 0.9,
     height: Dimensions.get('window').height * 0.7,
+  },
+  loadingOverlay: {
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    zIndex: 1000,
+  },
+  loadingBox: {
+    backgroundColor: RetroTheme.colors.layer2,
+    padding: 24,
+    borderRadius: RetroTheme.borderRadius.lg,
+    borderWidth: 2,
+    borderColor: RetroTheme.colors.borderLight,
+    ...RetroTheme.shadows.large,
+    alignItems: 'center' as const,
+  },
+  loadingOverlayText: {
+    ...RetroTheme.text.body,
+    marginTop: 12,
+    color: RetroTheme.colors.text,
   },
 };
 

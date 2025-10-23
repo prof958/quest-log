@@ -268,6 +268,7 @@ const styles = {
     alignItems: 'center' as const,
     paddingHorizontal: 20,
     paddingVertical: 16,
+    paddingTop: 40,
     backgroundColor: RetroTheme.colors.layer2,
     borderBottomWidth: 2,
     borderBottomColor: RetroTheme.colors.borderLight,

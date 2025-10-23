@@ -26,6 +26,7 @@ const MainAppScreen: React.FC = () => {
   const [userGames, setUserGames] = useState<LibraryGameData[]>([]);
   const [selectedGameId, setSelectedGameId] = useState<number | null>(null);
   const [loadingLibrary, setLoadingLibrary] = useState(false);
+  const [previousView, setPreviousView] = useState<MainAppView>('search');
 
   // Helper functions for status
   const getStatusColor = (status: string) => {
@@ -107,14 +108,15 @@ const MainAppScreen: React.FC = () => {
 
   const handleGameSelect = (game: IGDBGame) => {
     console.log(`🎮 Opening game details: ${game.name}`);
+    setPreviousView('search');
     setSelectedGameId(game.id);
     setCurrentView('gameDetails');
   };
 
   const handleBackFromGameDetails = () => {
-    console.log('⬅️ Returning from game details');
+    console.log('⬅️ Returning from game details to:', previousView);
     setSelectedGameId(null);
-    setCurrentView('search');
+    setCurrentView(previousView);
     // Reload library when coming back from game details
     if (user) {
       loadUserLibrary();
@@ -123,6 +125,7 @@ const MainAppScreen: React.FC = () => {
 
   const handleLibraryGameSelect = (gameId: number) => {
     console.log(`🎮 Game selected from library: ${gameId}`);
+    setPreviousView('library');
     setSelectedGameId(gameId);
     setCurrentView('gameDetails');
   };
@@ -282,7 +285,7 @@ const MainAppScreen: React.FC = () => {
               >
                 <Text style={styles.backButtonText}>←</Text>
               </TouchableOpacity>
-              <Text style={styles.sectionTitle}>Profile</Text>
+              <Text style={styles.profileTitle}>Profile</Text>
             </View>
             
             <View style={styles.profileInfo}>
@@ -704,6 +707,11 @@ const styles = {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     marginBottom: 20,
+  },
+  profileTitle: {
+    fontSize: 20,
+    fontWeight: 'bold' as const,
+    color: RetroTheme.colors.text,
   },
   profileInfo: {
     backgroundColor: RetroTheme.colors.layer2,
