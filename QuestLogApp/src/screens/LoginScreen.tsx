@@ -8,13 +8,13 @@ import {
   Platform,
   ScrollView,
   TouchableOpacity,
-  Alert,
   TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RetroTheme } from '../theme/RetroTheme';
 import { AuthService } from '../services/AuthService';
 import { useAuth } from '../context/AuthContext';
+import { useRetroAlert } from '../hooks/useRetroAlert';
 
 // Simple gaming controller icon component
 const GameControllerIcon = () => (
@@ -35,6 +35,7 @@ interface LoginScreenProps {
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onShowSignUp }) => {
   const { user, session } = useAuth();
+  const { showAlert, AlertComponent } = useRetroAlert();
   const [showAuthOptions, setShowAuthOptions] = useState<false | 'buttons' | 'login'>(false);
   const [formData, setFormData] = useState({
     email: '',
@@ -83,7 +84,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onShowSignUp }) => {
 
   const handleEmailLogin = async () => {
     if (!formData.email.trim() || !formData.password.trim()) {
-      Alert.alert('Login Error', 'Please enter both email and password');
+      showAlert('Login Error', 'Please enter both email and password');
       return;
     }
 
@@ -98,7 +99,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onShowSignUp }) => {
       
       if (result.error) {
         console.error('❌ Login failed:', result.error);
-        Alert.alert(
+        showAlert(
           'Login Failed',
           result.error.message || 'Invalid credentials. Please check your email and password.',
           [{ text: 'OK' }]
@@ -111,7 +112,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onShowSignUp }) => {
       
     } catch (error) {
       console.error('❌ Login error:', error);
-      Alert.alert(
+      showAlert(
         'Login Failed',
         'Invalid credentials or network error. Please try again.',
         [{ text: 'OK' }]
@@ -133,7 +134,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onShowSignUp }) => {
       
       if (result.error) {
         console.error('❌ Google login failed:', result.error);
-        Alert.alert(
+        showAlert(
           'Google Login Failed',
           result.error.message || 'Failed to sign in with Google. Please try again.',
           [{ text: 'OK' }]
@@ -158,7 +159,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onShowSignUp }) => {
         }
       } else {
         console.log('⚠️ No OAuth data received');
-        Alert.alert(
+        showAlert(
           'Authentication Error',
           'Failed to start authentication. Please try again.',
           [{ text: 'OK' }]
@@ -168,7 +169,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onShowSignUp }) => {
       
     } catch (error) {
       console.error('❌ Google login exception:', error);
-      Alert.alert(
+      showAlert(
         'Google Login Failed',
         'Failed to sign in with Google. Please try again.',
         [{ text: 'OK' }]
@@ -371,6 +372,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onShowSignUp }) => {
           </ScrollView>
         </KeyboardAvoidingView>
       </LinearGradient>
+
+      <AlertComponent />
     </SafeAreaView>
   );
 };

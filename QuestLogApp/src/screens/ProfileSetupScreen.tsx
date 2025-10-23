@@ -12,11 +12,11 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Image,
-  Alert,
 } from 'react-native';
 import { RetroTheme } from '../theme/RetroTheme';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { useRetroAlert } from '../hooks/useRetroAlert';
 
 interface ProfileSetupScreenProps {
   onComplete: () => void;
@@ -27,16 +27,17 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({ onComple
   const [username, setUsername] = useState('');
   const [fullName, setFullName] = useState(user?.user_metadata?.full_name || '');
   const [loading, setLoading] = useState(false);
+  const { showAlert, AlertComponent } = useRetroAlert();
 
   const handleSubmit = async () => {
     if (!username.trim()) {
-      Alert.alert('Username Required', 'Please enter a username');
+      showAlert('Username Required', 'Please enter a username');
       return;
     }
 
     // Validate username (alphanumeric, 3-20 chars)
     if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
-      Alert.alert(
+      showAlert(
         'Invalid Username',
         'Username must be 3-20 characters and contain only letters, numbers, and underscores'
       );
@@ -54,7 +55,7 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({ onComple
         .single();
 
       if (existing) {
-        Alert.alert('Username Taken', 'This username is already in use. Please choose another.');
+        showAlert('Username Taken', 'This username is already in use. Please choose another.');
         setLoading(false);
         return;
       }
@@ -75,7 +76,7 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({ onComple
       onComplete();
     } catch (error: any) {
       console.error('Failed to create profile:', error);
-      Alert.alert('Error', error.message || 'Failed to create profile. Please try again.');
+      showAlert('Error', error.message || 'Failed to create profile. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -135,6 +136,7 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({ onComple
           </TouchableOpacity>
         </View>
       </View>
+      <AlertComponent />
     </View>
   );
 };

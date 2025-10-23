@@ -1,0 +1,16 @@
+# IDE
+.idea/
+.vscode/
+
+# Gradle
+.gradle/
+*.iml
+*.ipr
+*.iws
+
+# Build
+build/
+out/
+
+# Android Studio
+local.properties

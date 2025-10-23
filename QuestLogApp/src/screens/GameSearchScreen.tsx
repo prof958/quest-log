@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { View, Text, TextInput, FlatList, TouchableOpacity, Image, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TextInput, FlatList, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { RetroTheme } from '../theme/RetroTheme';
 import IGDBService, { IGDBGame } from '../services/IGDBService';
+import { useRetroAlert } from '../hooks/useRetroAlert';
 
 interface GameSearchScreenProps {
   onGameSelect: (game: IGDBGame) => void;
@@ -122,6 +123,7 @@ const GameItem: React.FC<GameItemProps> = ({ game, onSelect }) => {
 };
 
 const GameSearchScreen: React.FC<GameSearchScreenProps> = ({ onGameSelect, onBack }) => {
+  const { showAlert, AlertComponent } = useRetroAlert();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<IGDBGame[]>([]);
   const [popularGames, setPopularGames] = useState<IGDBGame[]>([]);
@@ -149,7 +151,7 @@ const GameSearchScreen: React.FC<GameSearchScreenProps> = ({ onGameSelect, onBac
       console.log(`✅ Loaded ${games.length} popular games from IGDB`);
     } catch (error) {
       console.error('❌ Failed to load popular games:', error);
-      Alert.alert(
+      showAlert(
         'Error', 
         'Unable to load popular games from IGDB. Please check your internet connection and try again.'
       );
@@ -174,14 +176,14 @@ const GameSearchScreen: React.FC<GameSearchScreenProps> = ({ onGameSelect, onBac
       
       // If no results, show a helpful message
       if (games.length === 0) {
-        Alert.alert(
+        showAlert(
           'No Results', 
           `No games found for "${query}" in IGDB database. Try a different search term or check the spelling.`
         );
       }
     } catch (error) {
       console.error('❌ IGDB search failed:', error);
-      Alert.alert(
+      showAlert(
         'Search Error', 
         'Failed to search IGDB database. Please check your internet connection and try again.'
       );
@@ -282,6 +284,8 @@ const GameSearchScreen: React.FC<GameSearchScreenProps> = ({ onGameSelect, onBac
           </View>
         ) : null}
       </View>
+
+      <AlertComponent />
     </View>
   );
 };

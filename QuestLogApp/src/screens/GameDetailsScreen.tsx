@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
-  Alert,
   Dimensions,
   FlatList,
   TextInput,
@@ -19,6 +18,7 @@ import { useAuth } from '../context/AuthContext';
 import ActivityLogService from '../services/ActivityLogService';
 import { StarRating } from '../components/StarRating';
 import { CategoryInfoModal, RATING_CATEGORIES, RatingCategory } from '../components/CategoryInfoModal';
+import { useRetroAlert } from '../hooks/useRetroAlert';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -84,6 +84,7 @@ const ScreenshotItem: React.FC<ScreenshotItemProps> = ({ screenshot, onPress }) 
 
 const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack }) => {
   const { user } = useAuth();
+  const { showAlert, AlertComponent } = useRetroAlert();
   const [game, setGame] = useState<IGDBGame | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -261,17 +262,17 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
       
       setIsInLibrary(true);
       setUserStatus('plan_to_play');
-      Alert.alert('Success', 'Game added to your library!');
+      showAlert('Success', 'Game added to your library!');
     } catch (err) {
       console.error('Failed to add game to library:', err);
-      Alert.alert('Error', 'Failed to add game to library');
+      showAlert('Error', 'Failed to add game to library');
     }
   };
 
   const handleRemoveFromLibrary = async () => {
     if (!user || !game) return;
 
-    Alert.alert(
+    showAlert(
       'Remove Game',
       'Are you sure you want to remove this game from your library?',
       [
@@ -286,10 +287,10 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
               setUserRating(0);
               setUserReview('');
               setUserStatus('not_played');
-              Alert.alert('Success', 'Game removed from your library');
+              showAlert('Success', 'Game removed from your library');
             } catch (err) {
               console.error('Failed to remove game from library:', err);
-              Alert.alert('Error', 'Failed to remove game from library');
+              showAlert('Error', 'Failed to remove game from library');
             }
           },
         },
@@ -335,7 +336,7 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
       console.log('✅ Status updated successfully to:', newStatus);
     } catch (err) {
       console.error('Failed to update game status:', err);
-      Alert.alert('Error', 'Failed to update game status');
+      showAlert('Error', 'Failed to update game status');
     } finally {
       setIsSaving(false);
     }
@@ -360,7 +361,7 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
     const hasRatings = Object.values(categoryRatings).some(r => r >= 1);
     if (!hasRatings) {
       console.log('❌ Cannot save - no category ratings selected');
-      Alert.alert('Rating Required', 'Please rate at least one category before saving.');
+      showAlert('Rating Required', 'Please rate at least one category before saving.');
       return;
     }
 
@@ -368,7 +369,7 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
     const invalidRatings = Object.entries(categoryRatings).filter(([_, r]) => r > 0 && r < 1);
     if (invalidRatings.length > 0) {
       console.log('❌ Cannot save - ratings below 1.0 detected:', invalidRatings);
-      Alert.alert('Invalid Rating', 'Ratings must be between 1 and 5 stars.');
+      showAlert('Invalid Rating', 'Ratings must be between 1 and 5 stars.');
       return;
     }
 
@@ -427,11 +428,11 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
       await loadUserGameData();
       await loadQuestLogRating();
       
-      Alert.alert('Success', 'Your rating has been saved!');
+      showAlert('Success', 'Your rating has been saved!');
     } catch (err) {
       console.error('❌ Failed to save rating:', err);
       console.error('Error details:', JSON.stringify(err, null, 2));
-      Alert.alert('Error', `Failed to save rating: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      showAlert('Error', `Failed to save rating: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setIsSaving(false);
     }
@@ -780,7 +781,7 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
                   <TouchableOpacity 
                     key={index} 
                     style={styles.companyChip}
-                    onPress={() => Alert.alert(
+                    onPress={() => showAlert(
                       company.company.name,
                       `${company.developer && company.publisher
                         ? 'Developer & Publisher'
@@ -1060,6 +1061,8 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
           </View>
         </View>
       )}
+
+      <AlertComponent />
     </View>
   );
 };
