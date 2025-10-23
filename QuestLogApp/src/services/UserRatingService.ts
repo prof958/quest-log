@@ -6,11 +6,25 @@
 
 import { supabase } from '../lib/supabase';
 
+export interface CategoryRatings {
+  story?: number; // 1-5 with 0.5 increments
+  gameplay?: number; // 1-5 with 0.5 increments
+  audio?: number; // 1-5 with 0.5 increments
+  visual?: number; // 1-5 with 0.5 increments
+  joy?: number; // 1-5 with 0.5 increments
+}
+
 export interface UserGameRating {
   id: string;
   user_id: string;
   igdb_game_id: number;
-  rating: number; // 1-10 scale
+  rating: number; // 1-10 scale (overall, calculated or user-provided)
+  // Category ratings (1-5 scale with 0.5 increments)
+  rating_story?: number;
+  rating_gameplay?: number;
+  rating_audio?: number;
+  rating_visual?: number;
+  rating_joy?: number;
   review?: string;
   play_status: 'not_played' | 'playing' | 'completed' | 'dropped' | 'plan_to_play';
   hours_played?: number;
@@ -61,13 +75,16 @@ export class UserRatingService {
 
   /**
    * Add or update a user's rating for a game
+   * @param categoryRatings - Optional detailed category ratings (1-5 scale)
+   * If provided, overall rating will be calculated as average * 2 (to maintain 1-10 scale)
    */
   public async rateGame(
     igdbGameId: number,
     rating: number,
     review?: string,
     playStatus?: UserGameRating['play_status'],
-    hoursPlayed?: number
+    hoursPlayed?: number,
+    categoryRatings?: CategoryRatings
   ): Promise<UserGameRating | null> {
     try {
       console.log('🔧 UserRatingService.rateGame called');
@@ -75,6 +92,7 @@ export class UserRatingService {
       console.log('  - rating:', rating);
       console.log('  - review:', review ? 'provided' : 'none');
       console.log('  - playStatus:', playStatus);
+      console.log('  - categoryRatings:', categoryRatings);
 
       const { data: { user } } = await supabase.auth.getUser();
       console.log('  - user:', user ? user.id : 'null');
@@ -83,7 +101,18 @@ export class UserRatingService {
         throw new Error('User not authenticated');
       }
 
-      if (rating < 1 || rating > 10) {
+      // Calculate overall rating from categories if provided
+      let finalRating = rating;
+      if (categoryRatings) {
+        const categories = Object.values(categoryRatings).filter(r => r !== undefined) as number[];
+        if (categories.length > 0) {
+          const avgCategoryRating = categories.reduce((sum, r) => sum + r, 0) / categories.length;
+          finalRating = avgCategoryRating * 2; // Convert 1-5 to 1-10 scale
+          console.log('  - calculated overall from categories:', finalRating);
+        }
+      }
+
+      if (finalRating < 1 || finalRating > 10) {
         throw new Error('Rating must be between 1 and 10');
       }
 
@@ -104,7 +133,12 @@ export class UserRatingService {
       const ratingData = {
         user_id: user.id,
         igdb_game_id: igdbGameId,
-        rating,
+        rating: finalRating,
+        rating_story: categoryRatings?.story,
+        rating_gameplay: categoryRatings?.gameplay,
+        rating_audio: categoryRatings?.audio,
+        rating_visual: categoryRatings?.visual,
+        rating_joy: categoryRatings?.joy,
         review,
         play_status: playStatus || 'not_played',
         hours_played: hoursPlayed,

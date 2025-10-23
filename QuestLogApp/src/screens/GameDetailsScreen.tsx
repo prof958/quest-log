@@ -14,9 +14,11 @@ import {
 } from 'react-native';
 import { RetroTheme } from '../theme/RetroTheme';
 import { IGDBGame, IGDBService } from '../services/IGDBService';
-import { UserRatingService, UserGameStatus } from '../services/UserRatingService';
+import { UserRatingService, UserGameStatus, CategoryRatings } from '../services/UserRatingService';
 import { useAuth } from '../context/AuthContext';
 import ActivityLogService from '../services/ActivityLogService';
+import { StarRating } from '../components/StarRating';
+import { CategoryInfoModal, RATING_CATEGORIES, RatingCategory } from '../components/CategoryInfoModal';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -67,7 +69,7 @@ const ScreenshotItem: React.FC<ScreenshotItemProps> = ({ screenshot, onPress }) 
           />
           {imageLoading && (
             <View style={styles.screenshotLoader}>
-              <ActivityIndicator size="small" color={RetroTheme.colors.accent} />
+              <ActivityIndicator size="small" color={RetroTheme.colors.primary} />
             </View>
           )}
         </>
@@ -88,12 +90,21 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
   
   // User interaction states
   const [userRating, setUserRating] = useState<number>(0);
+  const [categoryRatings, setCategoryRatings] = useState<CategoryRatings>({
+    story: 0,
+    gameplay: 0,
+    audio: 0,
+    visual: 0,
+    joy: 0,
+  });
   const [userReview, setUserReview] = useState<string>('');
   const [userStatus, setUserStatus] = useState<UserGameStatus>('not_played');
   const [isInLibrary, setIsInLibrary] = useState(false);
   
   // UI states
   const [showRatingModal, setShowRatingModal] = useState(false);
+  const [showCategoryInfo, setShowCategoryInfo] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<RatingCategory | null>(null);
   const [showImageModal, setShowImageModal] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string>('');
   const [expandedDescription, setExpandedDescription] = useState(false);
@@ -146,9 +157,25 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
         if (rating && Array.isArray(rating) && rating.length > 0) {
           ratingValue = rating[0].rating || 0;
           setUserReview(rating[0].review || '');
+          // Load category ratings
+          setCategoryRatings({
+            story: rating[0].rating_story || 0,
+            gameplay: rating[0].rating_gameplay || 0,
+            audio: rating[0].rating_audio || 0,
+            visual: rating[0].rating_visual || 0,
+            joy: rating[0].rating_joy || 0,
+          });
         } else if (rating && typeof rating === 'object' && 'rating' in rating) {
           ratingValue = rating.rating || 0;
           setUserReview(rating.review || '');
+          // Load category ratings
+          setCategoryRatings({
+            story: rating.rating_story || 0,
+            gameplay: rating.rating_gameplay || 0,
+            audio: rating.rating_audio || 0,
+            visual: rating.rating_visual || 0,
+            joy: rating.rating_joy || 0,
+          });
         }
         
         // Convert from 10-point scale to 5-star scale for display
@@ -162,6 +189,13 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
       } else {
         console.log('ℹ️ No user game data found - resetting to defaults');
         setUserRating(0);
+        setCategoryRatings({
+          story: 0,
+          gameplay: 0,
+          audio: 0,
+          visual: 0,
+          joy: 0,
+        });
         setUserReview('');
         setUserStatus('not_played');
         setIsInLibrary(false);
@@ -261,6 +295,13 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
     }
   };
 
+  // Calculate overall rating from category ratings
+  const calculateOverallRating = (categories: CategoryRatings): number => {
+    const ratings = Object.values(categories).filter(r => r > 0);
+    if (ratings.length === 0) return 0;
+    return ratings.reduce((sum, r) => sum + r, 0) / ratings.length;
+  };
+
   const handleSaveRating = async () => {
     if (!user || !game) {
       console.log('❌ Cannot save rating - user or game is null');
@@ -269,22 +310,28 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
       return;
     }
 
-    if (userRating === 0) {
-      console.log('❌ Cannot save - no rating selected');
-      Alert.alert('Rating Required', 'Please select a rating (1-5 stars) before saving.');
+    // Validate at least one category is rated
+    const hasRatings = Object.values(categoryRatings).some(r => r > 0);
+    if (!hasRatings) {
+      console.log('❌ Cannot save - no category ratings selected');
+      Alert.alert('Rating Required', 'Please rate at least one category before saving.');
       return;
     }
 
+    // Calculate overall rating from categories
+    const overallRating = calculateOverallRating(categoryRatings);
+
     console.log('💾 Starting save rating process...');
     console.log('Game ID:', gameId);
-    console.log('User Rating:', userRating);
+    console.log('Category Ratings:', categoryRatings);
+    console.log('Overall Rating:', overallRating);
     console.log('User Review:', userReview ? 'exists' : 'none');
     console.log('User Status:', userStatus);
     console.log('Is in Library:', isInLibrary);
 
     try {
-      // Convert 5-star rating to 10-point scale for database
-      const ratingOutOf10 = userRating * 2;
+      // Convert 5-star overall to 10-point scale for database
+      const ratingOutOf10 = overallRating * 2;
       console.log('Converted rating (1-10 scale):', ratingOutOf10);
 
       setIsSaving(true);
@@ -296,15 +343,20 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
         setIsInLibrary(true);
       }
       
-      // Always update/add the rating regardless of library status
-      console.log('⭐ Saving rating...');
-      const ratingResult = await UserRatingService.getInstance().updateGameRating(
-        gameId, 
-        ratingOutOf10,  // Use converted rating
-        userReview, 
-        userStatus
+      // Save rating with category ratings
+      console.log('⭐ Saving rating with categories...');
+      const ratingResult = await UserRatingService.getInstance().rateGame(
+        gameId,
+        ratingOutOf10,  // Overall rating (1-10 scale)
+        userReview,
+        userStatus,
+        undefined,  // hours_played
+        categoryRatings  // Category ratings
       );
       console.log('✅ Rating save result:', ratingResult);
+      
+      // Update local state with overall
+      setUserRating(overallRating);
       
       // Log rating activity
       await ActivityLogService.getInstance().logActivity(
@@ -384,7 +436,7 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
           >
             <Text style={[
               styles.star,
-              { color: star <= rating ? RetroTheme.colors.accent : RetroTheme.colors.secondary }
+              { color: star <= rating ? RetroTheme.colors.primary : RetroTheme.colors.secondary }
             ]}>
               ★
             </Text>
@@ -397,7 +449,7 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={RetroTheme.colors.accent} />
+        <ActivityIndicator size="large" color={RetroTheme.colors.primary} />
         <Text style={styles.loadingText}>Loading game details...</Text>
       </View>
     );
@@ -668,44 +720,96 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
         onRequestClose={() => setShowRatingModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Rate & Review</Text>
-            
-            <View style={styles.modalRatingSection}>
-              <Text style={styles.modalLabel}>Your Rating:</Text>
-              {renderStars(userRating, setUserRating, true)}
-            </View>
+          <ScrollView style={styles.modalScrollView}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Rate {game?.name}</Text>
+              
+              {/* Category Ratings */}
+              <View style={styles.categoriesContainer}>
+                {RATING_CATEGORIES.map((category) => (
+                  <View key={category.id} style={styles.categoryRow}>
+                    <TouchableOpacity
+                      style={styles.categoryHeader}
+                      onPress={() => {
+                        setSelectedCategory(category);
+                        setShowCategoryInfo(true);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.categoryIcon}>{category.icon}</Text>
+                      <Text style={styles.categoryName}>{category.shortName}</Text>
+                      <Text style={styles.infoIcon}>ⓘ</Text>
+                    </TouchableOpacity>
+                    
+                    <StarRating
+                      rating={categoryRatings[category.id as keyof CategoryRatings] || 0}
+                      interactive
+                      onRatingChange={(rating) => {
+                        setCategoryRatings(prev => ({
+                          ...prev,
+                          [category.id]: rating,
+                        }));
+                      }}
+                      size={28}
+                    />
+                  </View>
+                ))}
+              </View>
 
-            <View style={styles.modalReviewSection}>
-              <Text style={styles.modalLabel}>Your Review (Optional):</Text>
-              <TextInput
-                style={styles.reviewInput}
-                value={userReview}
-                onChangeText={setUserReview}
-                placeholder="Share your thoughts about this game..."
-                placeholderTextColor={RetroTheme.colors.secondary}
-                multiline
-                numberOfLines={4}
-              />
-            </View>
+              {/* Overall Rating Display */}
+              <View style={styles.overallSection}>
+                <Text style={styles.overallLabel}>Overall Rating</Text>
+                <StarRating
+                  rating={calculateOverallRating(categoryRatings)}
+                  size={32}
+                  showNumber
+                  color={RetroTheme.colors.primary}
+                />
+              </View>
 
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.modalCancelButton}
-                onPress={() => setShowRatingModal(false)}
-              >
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalSaveButton}
-                onPress={handleSaveRating}
-              >
-                <Text style={styles.modalSaveText}>Save</Text>
-              </TouchableOpacity>
+              {/* Review Section */}
+              <View style={styles.modalReviewSection}>
+                <Text style={styles.modalLabel}>Your Review (Optional):</Text>
+                <TextInput
+                  style={styles.reviewInput}
+                  value={userReview}
+                  onChangeText={setUserReview}
+                  placeholder="Share your thoughts about this game..."
+                  placeholderTextColor={RetroTheme.colors.secondary}
+                  multiline
+                  numberOfLines={4}
+                />
+              </View>
+
+              {/* Action Buttons */}
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={styles.modalCancelButton}
+                  onPress={() => setShowRatingModal(false)}
+                >
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.modalSaveButton}
+                  onPress={handleSaveRating}
+                  disabled={isSaving}
+                >
+                  <Text style={styles.modalSaveText}>
+                    {isSaving ? 'Saving...' : 'Save'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
+          </ScrollView>
         </View>
       </Modal>
+
+      {/* Category Info Modal */}
+      <CategoryInfoModal
+        visible={showCategoryInfo}
+        category={selectedCategory}
+        onClose={() => setShowCategoryInfo(false)}
+      />
 
       {/* Image Modal */}
       <Modal
@@ -872,7 +976,7 @@ const styles = {
   },
   ratingValue: {
     ...RetroTheme.text.h3,
-    color: RetroTheme.colors.accent,
+    color: RetroTheme.colors.primary,
     marginRight: 4,
   },
   ratingCount: {
@@ -1053,7 +1157,7 @@ const styles = {
   },
   expandButtonText: {
     ...RetroTheme.text.body,
-    color: RetroTheme.colors.accent,
+    color: RetroTheme.colors.primary,
     fontWeight: 'bold' as const,
   },
   platformsContainer: {
@@ -1194,7 +1298,7 @@ const styles = {
     ...RetroTheme.text.h2,
     textAlign: 'center' as const,
     marginBottom: 20,
-    color: RetroTheme.colors.accent,
+    color: RetroTheme.colors.primary,
   },
   modalRatingSection: {
     alignItems: 'center' as const,
@@ -1207,6 +1311,59 @@ const styles = {
   },
   modalReviewSection: {
     marginBottom: 20,
+  },
+  modalScrollView: {
+    maxHeight: Dimensions.get('window').height * 0.9,
+  },
+  modalSubtitle: {
+    ...RetroTheme.text.caption,
+    textAlign: 'center' as const,
+    marginBottom: 16,
+    color: RetroTheme.colors.textSecondary,
+  },
+  categoriesContainer: {
+    marginBottom: 20,
+  },
+  categoryRow: {
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: RetroTheme.colors.borderLight,
+  },
+  categoryHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    marginBottom: 8,
+  },
+  categoryIcon: {
+    fontSize: 20,
+    marginRight: 8,
+  },
+  categoryName: {
+    ...RetroTheme.text.body,
+    fontWeight: '600' as const,
+    flex: 1,
+    color: RetroTheme.colors.text,
+  },
+  infoIcon: {
+    fontSize: 16,
+    color: RetroTheme.colors.primary,
+    paddingHorizontal: 8,
+  },
+  overallSection: {
+    alignItems: 'center' as const,
+    paddingVertical: 16,
+    marginBottom: 16,
+    backgroundColor: RetroTheme.colors.layer1,
+    borderRadius: RetroTheme.borderRadius.md,
+    borderWidth: 2,
+    borderColor: RetroTheme.colors.primary,
+  },
+  overallLabel: {
+    ...RetroTheme.text.body,
+    fontWeight: 'bold' as const,
+    marginBottom: 8,
+    color: RetroTheme.colors.primary,
   },
   reviewInput: {
     backgroundColor: RetroTheme.colors.layer1,
