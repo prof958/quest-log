@@ -69,6 +69,50 @@ export const RetroTheme = {
     normal: 250,
     slow: 400,
   },
+
+  text: {
+    h1: {
+      fontSize: 32,
+      fontWeight: 'bold' as const,
+      fontFamily: 'System',
+      color: '#f8f7f6',
+      lineHeight: 38,
+    },
+    h2: {
+      fontSize: 24,
+      fontWeight: 'bold' as const,
+      fontFamily: 'System',
+      color: '#f8f7f6',
+      lineHeight: 30,
+    },
+    h3: {
+      fontSize: 20,
+      fontWeight: '600' as const,
+      fontFamily: 'System',
+      color: '#f8f7f6',
+      lineHeight: 26,
+    },
+    body: {
+      fontSize: 16,
+      fontWeight: 'normal' as const,
+      fontFamily: 'System',
+      color: '#f8f7f6',
+      lineHeight: 22,
+    },
+    caption: {
+      fontSize: 14,
+      fontWeight: 'normal' as const,
+      fontFamily: 'System',
+      color: '#8a7960',
+      lineHeight: 18,
+    },
+    button: {
+      fontSize: 16,
+      fontWeight: 'bold' as const,
+      fontFamily: 'System',
+      color: '#221c10',
+    },
+  },
 };
 
 export type Theme = typeof RetroTheme;

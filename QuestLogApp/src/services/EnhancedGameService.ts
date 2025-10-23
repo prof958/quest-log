@@ -1,4 +1,4 @@
-import { IGDBGame } from './LocalGameService';
+import { IGDBGame } from './IGDBService';
 
 // RAWG API Configuration
 const RAWG_BASE_URL = 'https://api.rawg.io/api';
@@ -147,10 +147,11 @@ export class EnhancedGameService {
 
   private async loadLocalGames(): Promise<void> {
     try {
-      // Import from existing LocalGameService popular games
-      const LocalGameService = await import('./LocalGameService');
-      const localService = LocalGameService.default.getInstance();
-      this.localGames = await localService.getPopularGames(100);
+      // Load popular games from IGDB Service
+      const { IGDBService } = await import('./IGDBService');
+      const igdbService = IGDBService.getInstance();
+      // For now, use empty array. Popular games could be loaded from cache or a predefined list
+      this.localGames = [];
     } catch (error) {
       console.error('Failed to load local games:', error);
       this.localGames = [];

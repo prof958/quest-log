@@ -34,11 +34,13 @@ export interface GameRatingStats {
   };
 }
 
+export type UserGameStatus = 'playing' | 'completed' | 'plan_to_play' | 'dropped' | 'not_played';
+
 export interface UserGameLibraryEntry {
   id: string;
   user_id: string;
   igdb_game_id: number;
-  status: 'playing' | 'completed' | 'plan_to_play' | 'dropped' | 'not_played';
+  status: UserGameStatus;
   rating?: UserGameRating;
   added_at: string;
   updated_at: string;
@@ -68,7 +70,15 @@ export class UserRatingService {
     hoursPlayed?: number
   ): Promise<UserGameRating | null> {
     try {
+      console.log('🔧 UserRatingService.rateGame called');
+      console.log('  - igdbGameId:', igdbGameId);
+      console.log('  - rating:', rating);
+      console.log('  - review:', review ? 'provided' : 'none');
+      console.log('  - playStatus:', playStatus);
+
       const { data: { user } } = await supabase.auth.getUser();
+      console.log('  - user:', user ? user.id : 'null');
+      
       if (!user) {
         throw new Error('User not authenticated');
       }
@@ -77,13 +87,19 @@ export class UserRatingService {
         throw new Error('Rating must be between 1 and 10');
       }
 
+      console.log('📊 Checking for existing rating...');
       // Check if user already has a rating for this game
-      const { data: existingRating } = await supabase
+      const { data: existingRating, error: checkError } = await supabase
         .from('user_game_ratings')
         .select('*')
         .eq('user_id', user.id)
         .eq('igdb_game_id', igdbGameId)
         .single();
+
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.error('❌ Error checking existing rating:', checkError);
+      }
+      console.log('  - existing rating:', existingRating ? 'found' : 'none');
 
       const ratingData = {
         user_id: user.id,
@@ -96,6 +112,7 @@ export class UserRatingService {
       };
 
       if (existingRating) {
+        console.log('🔄 Updating existing rating...');
         // Update existing rating
         const { data, error } = await supabase
           .from('user_game_ratings')
@@ -104,9 +121,14 @@ export class UserRatingService {
           .select()
           .single();
 
-        if (error) throw error;
+        if (error) {
+          console.error('❌ Update error:', error);
+          throw error;
+        }
+        console.log('✅ Rating updated successfully');
         return data;
       } else {
+        console.log('➕ Creating new rating...');
         // Create new rating
         const { data, error } = await supabase
           .from('user_game_ratings')
@@ -117,15 +139,20 @@ export class UserRatingService {
           .select()
           .single();
 
-        if (error) throw error;
+        if (error) {
+          console.error('❌ Insert error:', error);
+          throw error;
+        }
+        console.log('✅ Rating created successfully');
         
         // Also add to user's library if not already there
+        console.log('📚 Adding to library...');
         await this.addToLibrary(igdbGameId, playStatus || 'not_played');
         
         return data;
       }
     } catch (error) {
-      console.error('Failed to rate game:', error);
+      console.error('❌ Failed to rate game:', error);
       throw error;
     }
   }
@@ -245,18 +272,30 @@ export class UserRatingService {
     status: UserGameLibraryEntry['status']
   ): Promise<UserGameLibraryEntry | null> {
     try {
+      console.log('🔧 UserRatingService.addToLibrary called');
+      console.log('  - igdbGameId:', igdbGameId);
+      console.log('  - status:', status);
+
       const { data: { user } } = await supabase.auth.getUser();
+      console.log('  - user:', user ? user.id : 'null');
+      
       if (!user) {
         throw new Error('User not authenticated');
       }
 
+      console.log('📊 Checking if game is already in library...');
       // Check if already in library
-      const { data: existing } = await supabase
+      const { data: existing, error: checkError } = await supabase
         .from('user_game_library')
         .select('*')
         .eq('user_id', user.id)
         .eq('igdb_game_id', igdbGameId)
         .single();
+
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.error('❌ Error checking library:', checkError);
+      }
+      console.log('  - existing entry:', existing ? 'found' : 'none');
 
       const libraryData = {
         user_id: user.id,
@@ -266,6 +305,7 @@ export class UserRatingService {
       };
 
       if (existing) {
+        console.log('🔄 Updating existing library entry...');
         // Update existing entry
         const { data, error } = await supabase
           .from('user_game_library')
@@ -274,9 +314,14 @@ export class UserRatingService {
           .select()
           .single();
 
-        if (error) throw error;
+        if (error) {
+          console.error('❌ Update error:', error);
+          throw error;
+        }
+        console.log('✅ Library entry updated successfully');
         return data;
       } else {
+        console.log('➕ Creating new library entry...');
         // Create new entry
         const { data, error } = await supabase
           .from('user_game_library')
@@ -287,11 +332,16 @@ export class UserRatingService {
           .select()
           .single();
 
-        if (error) throw error;
+        if (error) {
+          console.error('❌ Insert error:', error);
+          console.error('Error details:', JSON.stringify(error, null, 2));
+          throw error;
+        }
+        console.log('✅ Library entry created successfully');
         return data;
       }
     } catch (error) {
-      console.error('Failed to add to library:', error);
+      console.error('❌ Failed to add to library:', error);
       throw error;
     }
   }
@@ -306,18 +356,10 @@ export class UserRatingService {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return [];
 
+      // First, get library entries
       let query = supabase
         .from('user_game_library')
-        .select(`
-          *,
-          user_game_ratings (
-            rating,
-            review,
-            play_status,
-            hours_played,
-            updated_at
-          )
-        `)
+        .select('*')
         .eq('user_id', user.id)
         .order('updated_at', { ascending: false });
 
@@ -325,9 +367,30 @@ export class UserRatingService {
         query = query.eq('status', status);
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
-      return data || [];
+      const { data: libraryData, error: libraryError } = await query;
+      if (libraryError) throw libraryError;
+      if (!libraryData || libraryData.length === 0) return [];
+
+      // Then, get all ratings for this user
+      const { data: ratingsData, error: ratingsError } = await supabase
+        .from('user_game_ratings')
+        .select('*')
+        .eq('user_id', user.id);
+
+      if (ratingsError) {
+        console.error('Error fetching ratings:', ratingsError);
+      }
+
+      // Merge library and ratings data
+      const result = libraryData.map(library => {
+        const rating = ratingsData?.find(r => r.igdb_game_id === library.igdb_game_id);
+        return {
+          ...library,
+          rating: rating || undefined,
+        };
+      });
+
+      return result;
     } catch (error) {
       console.error('Failed to get user library:', error);
       return [];
@@ -434,6 +497,86 @@ export class UserRatingService {
       console.error('Failed to get top rated games:', error);
       return [];
     }
+  }
+  /**
+   * Get user's game library entry for a specific game
+   */
+  public async getUserGame(igdbGameId: number): Promise<UserGameLibraryEntry | null> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+
+      // Get library entry
+      const { data: libraryData, error: libraryError } = await supabase
+        .from('user_game_library')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('igdb_game_id', igdbGameId)
+        .single();
+
+      if (libraryError && libraryError.code !== 'PGRST116') { // Not found error
+        throw libraryError;
+      }
+
+      if (!libraryData) return null;
+
+      // Get rating for this game
+      const { data: ratingData } = await supabase
+        .from('user_game_ratings')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('igdb_game_id', igdbGameId)
+        .single();
+
+      // Merge library and rating data
+      return {
+        ...libraryData,
+        rating: ratingData || undefined,
+      };
+    } catch (error) {
+      console.error('Failed to get user game:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Add game to user's library (alias for addToLibrary)
+   */
+  public async addGameToLibrary(
+    igdbGameId: number,
+    status: UserGameLibraryEntry['status']
+  ): Promise<UserGameLibraryEntry | null> {
+    return this.addToLibrary(igdbGameId, status);
+  }
+
+  /**
+   * Remove game from user's library (alias for removeFromLibrary)
+   */
+  public async removeGameFromLibrary(igdbGameId: number): Promise<boolean> {
+    return this.removeFromLibrary(igdbGameId);
+  }
+
+  /**
+   * Update game status in user's library
+   */
+  public async updateGameStatus(
+    igdbGameId: number,
+    status: UserGameLibraryEntry['status']
+  ): Promise<UserGameLibraryEntry | null> {
+    return this.addToLibrary(igdbGameId, status); // addToLibrary handles updates
+  }
+
+  /**
+   * Update user's rating for a game (alias for rateGame)
+   */
+  public async updateGameRating(
+    igdbGameId: number,
+    rating: number,
+    review?: string,
+    playStatus?: UserGameRating['play_status'],
+    hoursPlayed?: number
+  ): Promise<UserGameRating | null> {
+    return this.rateGame(igdbGameId, rating, review, playStatus, hoursPlayed);
   }
 }
 

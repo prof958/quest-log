@@ -438,14 +438,6 @@ export class IGDBService {
     this.cache.clear();
     console.log('IGDB cache cleared');
   }
-
-  /**
-   * Clear local cache
-   */
-  public clearCache(): void {
-    this.cache.clear();
-    console.log('Local IGDB cache cleared');
-  }
 }
 
 export default IGDBService;

@@ -1,23 +1,100 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { RetroTheme } from '../theme/RetroTheme';
 import { useAuth } from '../context/AuthContext';
 import GameSearchScreen from './GameSearchScreen';
-import { IGDBGame } from '../services/IGDBService';
+import GameDetailsScreen from './GameDetailsScreen';
+import IGDBService, { IGDBGame } from '../services/IGDBService';
+import UserRatingService, { UserGameLibraryEntry } from '../services/UserRatingService';
 
-type MainAppView = 'home' | 'search' | 'library' | 'profile';
+type MainAppView = 'home' | 'search' | 'library' | 'profile' | 'gameDetails';
+
+interface LibraryGameData {
+  igdbGameId: number;
+  game?: IGDBGame;
+  status: string;
+  rating?: number;
+  addedAt: string;
+}
 
 const MainAppScreen: React.FC = () => {
   const { user, signOut } = useAuth();
   const [currentView, setCurrentView] = useState<MainAppView>('home');
-  const [userGames, setUserGames] = useState<IGDBGame[]>([]);
+  const [userGames, setUserGames] = useState<LibraryGameData[]>([]);
+  const [selectedGameId, setSelectedGameId] = useState<number | null>(null);
+  const [loadingLibrary, setLoadingLibrary] = useState(false);
+
+  // Load library when switching to library or home view
+  useEffect(() => {
+    if (user && (currentView === 'library' || currentView === 'home')) {
+      loadUserLibrary();
+    }
+  }, [user, currentView]);
+
+  const loadUserLibrary = async () => {
+    if (!user) return;
+
+    try {
+      console.log('📚 Loading user library from database...');
+      setLoadingLibrary(true);
+      
+      // Get library entries from database
+      const libraryEntries = await UserRatingService.getInstance().getUserLibrary();
+      console.log(`✅ Found ${libraryEntries.length} games in library`);
+
+      // Fetch IGDB data for each game
+      const igdbService = IGDBService.getInstance();
+      const gamesWithData: LibraryGameData[] = [];
+
+      for (const entry of libraryEntries) {
+        try {
+          const gameData = await igdbService.getGameDetails(entry.igdb_game_id);
+          
+          // Extract rating if available
+          let rating = 0;
+          if (entry.rating) {
+            if (Array.isArray(entry.rating) && entry.rating.length > 0) {
+              rating = entry.rating[0].rating;
+            } else if (typeof entry.rating === 'object' && 'rating' in entry.rating) {
+              rating = entry.rating.rating;
+            }
+          }
+
+          gamesWithData.push({
+            igdbGameId: entry.igdb_game_id,
+            game: gameData || undefined,
+            status: entry.status,
+            rating: rating,
+            addedAt: entry.added_at,
+          });
+        } catch (err) {
+          console.error(`Failed to load game ${entry.igdb_game_id}:`, err);
+        }
+      }
+
+      setUserGames(gamesWithData);
+      console.log(`✅ Loaded ${gamesWithData.length} games with IGDB data`);
+    } catch (error) {
+      console.error('❌ Failed to load user library:', error);
+    } finally {
+      setLoadingLibrary(false);
+    }
+  };
 
   const handleGameSelect = (game: IGDBGame) => {
-    console.log(`🎮 Adding game to library: ${game.name}`);
-    // TODO: Implement Supabase database integration for user game library
-    // This will be handled in the next iteration
-    setUserGames(prev => [...prev, game]);
-    setCurrentView('library');
+    console.log(`🎮 Opening game details: ${game.name}`);
+    setSelectedGameId(game.id);
+    setCurrentView('gameDetails');
+  };
+
+  const handleBackFromGameDetails = () => {
+    console.log('⬅️ Returning from game details');
+    setSelectedGameId(null);
+    setCurrentView('search');
+    // Reload library when coming back from game details
+    if (user) {
+      loadUserLibrary();
+    }
   };
 
   const handleSignOut = async () => {
@@ -28,6 +105,16 @@ const MainAppScreen: React.FC = () => {
       console.error('❌ Sign out failed:', error);
     }
   };
+
+  // Show GameDetailsScreen when a game is selected
+  if (currentView === 'gameDetails' && selectedGameId) {
+    return (
+      <GameDetailsScreen
+        gameId={selectedGameId}
+        onBack={handleBackFromGameDetails}
+      />
+    );
+  }
 
   if (currentView === 'search') {
     return (
@@ -117,13 +204,21 @@ const MainAppScreen: React.FC = () => {
             {/* Recent Activity */}
             <View style={styles.recentContainer}>
               <Text style={styles.sectionTitle}>Recent Activity</Text>
-              {userGames.length > 0 ? (
-                userGames.slice(-3).reverse().map((game, index) => (
-                  <View key={`${game.id}-${index}`} style={styles.recentItem}>
+              {loadingLibrary ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color={RetroTheme.colors.primary} />
+                </View>
+              ) : userGames.length > 0 ? (
+                userGames.slice(-3).reverse().map((gameData, index) => (
+                  <View key={`${gameData.igdbGameId}-${index}`} style={styles.recentItem}>
                     <Text style={styles.recentIcon}>🎮</Text>
                     <View style={styles.recentContent}>
-                      <Text style={styles.recentTitle}>Added {game.name}</Text>
-                      <Text style={styles.recentTime}>Just now</Text>
+                      <Text style={styles.recentTitle}>
+                        Added {gameData.game?.name || 'Unknown Game'}
+                      </Text>
+                      <Text style={styles.recentTime}>
+                        {new Date(gameData.addedAt).toLocaleDateString()}
+                      </Text>
                     </View>
                   </View>
                 ))
@@ -149,14 +244,34 @@ const MainAppScreen: React.FC = () => {
               <Text style={styles.sectionTitle}>My Library</Text>
             </View>
             
-            {userGames.length > 0 ? (
-              userGames.map((game, index) => (
-                <View key={`${game.id}-${index}`} style={styles.libraryItem}>
-                  <Text style={styles.libraryGameName}>{game.name}</Text>
-                  <Text style={styles.libraryGameInfo}>
-                    Added to library • Just now
-                  </Text>
-                </View>
+            {loadingLibrary ? (
+              <View style={styles.emptyLibrary}>
+                <ActivityIndicator size="large" color={RetroTheme.colors.primary} />
+                <Text style={styles.emptyLibrarySubtext}>Loading your library...</Text>
+              </View>
+            ) : userGames.length > 0 ? (
+              userGames.map((gameData, index) => (
+                <TouchableOpacity
+                  key={`${gameData.igdbGameId}-${index}`}
+                  style={styles.libraryItem}
+                  onPress={() => {
+                    setSelectedGameId(gameData.igdbGameId);
+                    setCurrentView('gameDetails');
+                  }}
+                >
+                  <View style={styles.libraryItemContent}>
+                    <Text style={styles.libraryGameName}>
+                      {gameData.game?.name || 'Loading...'}
+                    </Text>
+                    <Text style={styles.libraryGameInfo}>
+                      Status: {gameData.status}
+                      {gameData.rating ? ` • Rating: ${Math.round(gameData.rating / 2)}/5 ⭐` : ''}
+                    </Text>
+                    <Text style={styles.libraryGameDate}>
+                      Added {new Date(gameData.addedAt).toLocaleDateString()}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
               ))
             ) : (
               <View style={styles.emptyLibrary}>
@@ -356,6 +471,10 @@ const styles = {
     color: RetroTheme.colors.textSecondary,
     marginTop: 2,
   },
+  loadingContainer: {
+    alignItems: 'center' as const,
+    padding: 20,
+  },
   emptyRecent: {
     alignItems: 'center' as const,
     padding: 20,
@@ -395,6 +514,9 @@ const styles = {
     borderWidth: 2,
     borderColor: RetroTheme.colors.border,
   },
+  libraryItemContent: {
+    flex: 1,
+  },
   libraryGameName: {
     fontSize: 16,
     fontWeight: 'bold' as const,
@@ -404,6 +526,11 @@ const styles = {
     fontSize: 12,
     color: RetroTheme.colors.textSecondary,
     marginTop: 4,
+  },
+  libraryGameDate: {
+    fontSize: 10,
+    color: RetroTheme.colors.textSecondary,
+    marginTop: 2,
   },
   emptyLibrary: {
     alignItems: 'center' as const,
