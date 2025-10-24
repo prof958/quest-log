@@ -12,6 +12,7 @@ import {
   Modal,
   Platform,
   Animated,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RetroTheme } from '../theme/RetroTheme';
@@ -910,8 +911,15 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
         transparent={true}
         onRequestClose={() => setShowRatingModal(false)}
       >
-        <View style={styles.modalOverlay}>
-          <ScrollView style={styles.modalScrollView}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <ScrollView 
+            style={styles.modalScrollView}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.modalScrollContent}
+          >
             <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>Rate {game?.name}</Text>
               
@@ -992,7 +1000,7 @@ const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ gameId, onBack })
               </View>
             </View>
           </ScrollView>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Category Info Modal */}
@@ -1774,6 +1782,9 @@ const styles = {
   },
   modalScrollView: {
     maxHeight: Dimensions.get('window').height * 0.9,
+  },
+  modalScrollContent: {
+    paddingBottom: Platform.OS === 'android' ? 100 : 50,
   },
   modalSubtitle: {
     ...RetroTheme.text.caption,

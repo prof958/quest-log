@@ -239,24 +239,26 @@ const GameSearchScreen: React.FC<GameSearchScreenProps> = ({ onGameSelect, onBac
       </View>
       {/* Search Input */}
       <View style={styles.searchContainer}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search for games..."
-          placeholderTextColor={RetroTheme.colors.textSecondary}
-          value={searchQuery}
-          onChangeText={handleSearchChange}
-          onSubmitEditing={handleSearchSubmit}
-          autoCorrect={false}
-          returnKeyType="search"
-          clearButtonMode="while-editing"
-        />
-        {(isLoading || isLoadingPopular) && (
-          <ActivityIndicator 
-            style={styles.searchLoader} 
-            color={RetroTheme.colors.primary} 
-            size="small"
+        <View style={styles.searchInputWrapper}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search for games..."
+            placeholderTextColor={RetroTheme.colors.textSecondary}
+            value={searchQuery}
+            onChangeText={handleSearchChange}
+            onSubmitEditing={handleSearchSubmit}
+            autoCorrect={false}
+            returnKeyType="search"
+            clearButtonMode="while-editing"
           />
-        )}
+          {(isLoading || isLoadingPopular) && (
+            <ActivityIndicator 
+              style={styles.searchLoader} 
+              color={RetroTheme.colors.primary} 
+              size="small"
+            />
+          )}
+        </View>
       </View>
 
       {/* Games List */}
@@ -335,22 +337,25 @@ const styles = {
     paddingHorizontal: 20,
     paddingTop: 16,
     marginBottom: 20,
-    position: 'relative' as const,
   },
-  searchInput: {
+  searchInputWrapper: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
     backgroundColor: RetroTheme.colors.surface,
     borderRadius: 8,
+    borderWidth: 2,
+    borderColor: RetroTheme.colors.border,
+    paddingRight: 12,
+  },
+  searchInput: {
+    flex: 1,
     paddingHorizontal: 15,
     paddingVertical: 12,
     fontSize: 16,
     color: RetroTheme.colors.text,
-    borderWidth: 2,
-    borderColor: RetroTheme.colors.border,
   },
   searchLoader: {
-    position: 'absolute' as const,
-    right: 35,
-    top: 15,
+    marginRight: 8,
   },
   listContainer: {
     flex: 1,
